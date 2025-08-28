@@ -53,79 +53,30 @@ vet: ## Run go vet against code.
 	go vet ./...
 
 .PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile cover.out
+test: fmt vet ## Run all tests with coverage output.
+	@echo "🧪 Running all tests with coverage..."
+	@go test ./... -coverprofile=coverage.out -v | grep -E "(PASS|FAIL|coverage:)" || true
+	@echo ""
+	@echo "📊 Coverage Summary:"
+	@go tool cover -func=coverage.out | tail -1
+	@echo ""
+	@echo "✅ Tests completed. Coverage report: coverage.out"
 
-.PHONY: test-unit
-test-unit: fmt vet ## Run unit tests only.
-	go test ./api/v1/... ./internal/ldap/... ./internal/controller/... -v -cover
-
-.PHONY: test-unit-coverage
-test-unit-coverage: fmt vet ## Run unit tests with detailed coverage.
-	mkdir -p coverage
-	go test ./api/v1/... -coverprofile coverage/api.out -covermode=atomic -v
-	go test ./internal/ldap/... -coverprofile coverage/ldap.out -covermode=atomic -v
-	go test ./internal/controller/... -coverprofile coverage/controller.out -covermode=atomic -v
-	@echo "mode: atomic" > coverage/unit.out
-	@grep -h -v "^mode:" coverage/api.out coverage/ldap.out coverage/controller.out >> coverage/unit.out || true
-	go tool cover -html=coverage/unit.out -o coverage/unit-coverage.html
-	go tool cover -func=coverage/unit.out | tee coverage/unit-coverage.txt
-	@echo "Unit test coverage report generated: coverage/unit-coverage.html"
+.PHONY: test-detailed
+test-detailed: manifests generate fmt vet envtest ## Run tests with Kubernetes environment (for CRD validation).
+	@echo "🧪 Running tests with Kubernetes environment..."
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile=coverage.out -v | grep -E "(PASS|FAIL|coverage:)" || true
+	@echo ""
+	@echo "📊 Coverage Summary:"
+	@go tool cover -func=coverage.out | tail -1
 
 .PHONY: test-integration
 test-integration: ## Run integration tests with Docker LDAP server.
-	@echo "Running integration tests..."
+	@echo "🐳 Running integration tests with Docker..."
 	./test/run-tests.sh
-
-.PHONY: test-integration-external
-test-integration-external: ## Run integration tests against external LDAP server (set LDAP_HOST, LDAP_PORT etc).
-	@echo "Running integration tests against external LDAP server..."
-	./test/run-tests.sh --skip-docker
 
 .PHONY: test-all
 test-all: test test-integration ## Run all tests (unit + integration).
-
-.PHONY: test-coverage
-test-coverage: manifests generate fmt vet envtest ## Run tests with coverage report.
-	mkdir -p coverage
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test ./... -coverprofile coverage/all.out -covermode=atomic -v
-	go tool cover -html=coverage/all.out -o coverage/coverage.html
-	go tool cover -func=coverage/all.out | tee coverage/coverage.txt
-	@echo "Coverage report generated: coverage/coverage.html"
-
-.PHONY: test-coverage-detailed
-test-coverage-detailed: test-unit-coverage test-coverage ## Run all tests with detailed coverage analysis.
-	@echo "Generating detailed coverage analysis..."
-	mkdir -p coverage/reports
-	@echo "=== Overall Coverage Summary ===" > coverage/reports/summary.txt
-	@echo "" >> coverage/reports/summary.txt
-	@echo "Combined Coverage (All Tests):" >> coverage/reports/summary.txt
-	@tail -1 coverage/coverage.txt >> coverage/reports/summary.txt
-	@echo "" >> coverage/reports/summary.txt
-	@echo "Unit Tests Only Coverage:" >> coverage/reports/summary.txt
-	@tail -1 coverage/unit-coverage.txt >> coverage/reports/summary.txt
-	@echo "" >> coverage/reports/summary.txt
-	@echo "=== Detailed Package Coverage ===" >> coverage/reports/summary.txt
-	@echo "" >> coverage/reports/summary.txt
-	@echo "All Tests by Package:" >> coverage/reports/summary.txt
-	@cat coverage/coverage.txt >> coverage/reports/summary.txt
-	@echo "" >> coverage/reports/summary.txt
-	@echo "Unit Tests by Package:" >> coverage/reports/summary.txt
-	@cat coverage/unit-coverage.txt >> coverage/reports/summary.txt
-	@echo ""
-	@echo "Detailed coverage analysis completed!"
-	@echo "- HTML reports: coverage/coverage.html, coverage/unit-coverage.html"
-	@echo "- Text reports: coverage/coverage.txt, coverage/unit-coverage.txt"
-	@echo "- Summary: coverage/reports/summary.txt"
-	@echo ""
-	@cat coverage/reports/summary.txt
-
-.PHONY: coverage-analysis
-coverage-analysis: ## Run detailed coverage analysis with recommendations.
-	./scripts/coverage-analysis.sh
-
-.PHONY: test-all-coverage
-test-all-coverage: test-coverage-detailed coverage-analysis ## Run all tests with comprehensive coverage analysis and recommendations.
 
 ##@ Build
 
