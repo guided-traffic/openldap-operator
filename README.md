@@ -384,13 +384,17 @@ The OpenLDAP Operator can be installed using Helm or traditional Kubernetes mani
 ### Using Helm (Recommended)
 
 ```bash
-# Install from source
+# Add the Helm repository
+helm repo add openldap-operator https://guided-traffic.github.io/openldap-operator/
+helm repo update
+
+# Install the operator
+helm install openldap-operator openldap-operator/openldap-operator
+
+# Or install from source (if needed)
 git clone https://github.com/guided-traffic/openldap-operator.git
 cd openldap-operator
 helm install openldap-operator deploy/helm/openldap-operator
-
-# Or install from package
-helm install openldap-operator openldap-operator-0.1.0.tgz
 ```
 
 For detailed Helm installation options and configuration, see the [Helm Installation Guide](deploy/helm/INSTALLATION.md).
