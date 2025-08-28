@@ -98,7 +98,10 @@ Create the docker image name
 {{- define "openldap-operator.image" -}}
 {{- $registry := .Values.global.imageRegistry | default .Values.image.registry -}}
 {{- $repository := .Values.image.repository -}}
-{{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
+{{- $tag := .Values.image.tag -}}
+{{- if not $tag -}}
+{{- $tag = .Chart.AppVersion -}}
+{{- end -}}
 {{- if $registry -}}
 {{- printf "%s/%s:%s" $registry $repository $tag -}}
 {{- else -}}

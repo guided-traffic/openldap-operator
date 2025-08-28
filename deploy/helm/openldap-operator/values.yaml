@@ -11,9 +11,9 @@ global:
 
 # Operator image configuration
 image:
-  registry: ""
-  repository: openldap-operator
-  tag: "latest"
+  registry: "docker.io"
+  repository: "hansfischer/openldap-operator"
+  tag: ""  # Defaults to Chart.AppVersion if empty
   pullPolicy: IfNotPresent
 
 # Image pull secrets for the operator
@@ -63,9 +63,13 @@ operator:
 
   # Pod annotations
   podAnnotations: {}
+    # prometheus.io/scrape: "true"
+    # prometheus.io/port: "8080"
 
-  # Pod labels
+  # Pod labels (merged with default labels)
   podLabels: {}
+    # environment: production
+    # team: infrastructure
 
   # Security context for the pod
   podSecurityContext:
