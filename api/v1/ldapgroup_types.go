@@ -31,9 +31,6 @@ type LDAPGroupSpec struct {
 	// Description is the group description
 	Description string `json:"description,omitempty"`
 
-	// Members is a list of user DNs or usernames that should belong to this group
-	Members []string `json:"members,omitempty"`
-
 	// OrganizationalUnit specifies which OU the group should be placed in
 	// If not specified, defaults to "groups"
 	// +kubebuilder:default:="groups"

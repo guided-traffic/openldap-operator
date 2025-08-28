@@ -412,6 +412,48 @@ func (c *Client) GetGroupMembers(groupName, ou string, groupType openldapv1.Grou
 	return result.Entries[0].GetAttributeValues(attribute), nil
 }
 
+// GetUserGroups retrieves all groups that a user belongs to
+func (c *Client) GetUserGroups(username, userOU, groupOU string) ([]string, error) {
+	if username == "" {
+		return nil, fmt.Errorf("username cannot be empty")
+	}
+
+	userDN := c.buildUserDN(username, userOU)
+	baseDN := c.config.BaseDN
+	if groupOU != "" {
+		baseDN = fmt.Sprintf("ou=%s,%s", groupOU, c.config.BaseDN)
+	}
+
+	// Search for all groups that contain this user as a member
+	searchFilter := fmt.Sprintf("(|(member=%s)(uniqueMember=%s)(memberUid=%s))", userDN, userDN, username)
+	searchRequest := ldap.NewSearchRequest(
+		baseDN,
+		ldap.ScopeWholeSubtree,
+		ldap.NeverDerefAliases,
+		0,
+		30,
+		false,
+		searchFilter,
+		[]string{"cn"},
+		nil,
+	)
+
+	result, err := c.conn.Search(searchRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	var groups []string
+	for _, entry := range result.Entries {
+		groupName := entry.GetAttributeValue("cn")
+		if groupName != "" {
+			groups = append(groups, groupName)
+		}
+	}
+
+	return groups, nil
+}
+
 // buildUserDN builds the DN for a user
 func (c *Client) buildUserDN(username, ou string) string {
 	if ou == "" {

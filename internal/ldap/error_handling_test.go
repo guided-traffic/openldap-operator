@@ -250,7 +250,6 @@ var _ = Describe("LDAP Client Error Handling", func() {
 				GroupType:          v1.GroupTypePosix,
 				GroupID:            &groupID,
 				OrganizationalUnit: "teams",
-				Members:            []string{"user1", "user2", "user3"},
 				AdditionalAttributes: map[string][]string{
 					"businessCategory": {"IT"},
 					"location":         {"Building A"},
@@ -274,7 +273,6 @@ var _ = Describe("LDAP Client Error Handling", func() {
 				groupSpec := &v1.LDAPGroupSpec{
 					GroupName: "testgroup",
 					GroupType: groupType,
-					Members:   []string{"user1"},
 				}
 
 				// Test group operations for each type

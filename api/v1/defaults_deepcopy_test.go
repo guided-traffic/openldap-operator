@@ -266,9 +266,9 @@ var _ = Describe("DeepCopy Functions", func() {
 					LDAPServerRef: LDAPServerReference{
 						Name: "test-server",
 					},
-					GroupName: "testgroup",
-					Members:   []string{"user1", "user2"},
-					GroupID:   func(i int32) *int32 { return &i }(2001),
+					GroupName:   "testgroup",
+					Description: "Test group",
+					GroupID:     func(i int32) *int32 { return &i }(2001),
 				},
 			}
 
@@ -276,15 +276,14 @@ var _ = Describe("DeepCopy Functions", func() {
 
 			Expect(copy).NotTo(BeIdenticalTo(original))
 			Expect(copy.Spec.GroupName).To(Equal(original.Spec.GroupName))
-			Expect(copy.Spec.Members).To(Equal(original.Spec.Members))
-			Expect(copy.Spec.Members).NotTo(BeIdenticalTo(original.Spec.Members))
+			Expect(copy.Spec.Description).To(Equal(original.Spec.Description))
 			Expect(*copy.Spec.GroupID).To(Equal(*original.Spec.GroupID))
 			Expect(copy.Spec.GroupID).NotTo(BeIdenticalTo(original.Spec.GroupID))
 
 			// Modify copy and ensure original is unchanged
-			copy.Spec.Members[0] = "changed"
+			copy.Spec.Description = "changed"
 			*copy.Spec.GroupID = 3001
-			Expect(original.Spec.Members[0]).To(Equal("user1"))
+			Expect(original.Spec.Description).To(Equal("Test group"))
 			Expect(*original.Spec.GroupID).To(Equal(int32(2001)))
 		})
 	})

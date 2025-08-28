@@ -95,12 +95,6 @@ spec:
                 required:
                 - name
                 type: object
-              members:
-                description: Members is a list of user DNs or usernames that should
-                  belong to this group
-                items:
-                  type: string
-                type: array
               organizationalUnit:
                 default: groups
                 description: |-

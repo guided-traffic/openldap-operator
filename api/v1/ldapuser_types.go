@@ -94,6 +94,9 @@ type LDAPUserStatus struct {
 	// Groups contains the list of groups the user currently belongs to
 	Groups []string `json:"groups,omitempty"`
 
+	// MissingGroups contains the list of groups that don't exist in LDAP but are specified in spec.groups
+	MissingGroups []string `json:"missingGroups,omitempty"`
+
 	// LastModified is the timestamp of the last modification
 	LastModified *metav1.Time `json:"lastModified,omitempty"`
 

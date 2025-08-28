@@ -462,17 +462,19 @@ var _ = Describe("LDAP Integration Tests", func() {
 					Description:        "Test group",
 					OrganizationalUnit: "groups",
 					GroupType:          openldapv1.GroupTypeGroupOfNames,
-					Members: []string{
-						ldapUser.Name,
-					},
 				},
 			}
 		})
 
-		It("should manage group membership", func() {
-			// Create user and group
-			Expect(k8sClient.Create(ctx, ldapUser)).To(Succeed())
+		It("should manage group membership through LDAPUser", func() {
+			// Update the user to belong to the group
+			ldapUser.Spec.Groups = []string{testGroupName}
+
+			// Create group first (empty group)
 			Expect(k8sClient.Create(ctx, ldapGroup)).To(Succeed())
+
+			// Create/update user with group membership
+			Expect(k8sClient.Create(ctx, ldapUser)).To(Succeed())
 
 			// Wait for both to be ready
 			Eventually(func() bool {
@@ -498,7 +500,17 @@ var _ = Describe("LDAP Integration Tests", func() {
 				return userReady && groupReady
 			}, time.Minute, time.Second).Should(BeTrue())
 
-			// Verify group membership
+			// Verify user is in the group by checking user's groups in status
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name:      ldapUser.Name,
+				Namespace: ldapUser.Namespace,
+			}, ldapUser)).To(Succeed())
+
+			// The user's status should reflect the group membership
+			Expect(ldapUser.Status.Groups).To(ContainElement(testGroupName))
+			Expect(ldapUser.Status.MissingGroups).NotTo(ContainElement(testGroupName))
+
+			// Verify group membership in LDAP
 			members, err := ldapClient.GetGroupMembers(testGroupName, "groups", openldapv1.GroupTypeGroupOfNames)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(len(members)).To(BeNumerically(">=", 1))

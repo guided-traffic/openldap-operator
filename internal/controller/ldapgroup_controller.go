@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
@@ -227,23 +226,16 @@ func (r *LDAPGroupReconciler) createLDAPGroup(ctx context.Context, conn *ldap.Co
 		}
 	case openldapv1.GroupTypeGroupOfNames:
 		addRequest.Attribute("objectClass", []string{"groupOfNames"})
-		// groupOfNames requires at least one member
-		if len(ldapGroup.Spec.Members) == 0 {
-			// Add a dummy member that we'll remove later if real members are added
-			addRequest.Attribute("member", []string{"cn=dummy"})
-		}
+		// groupOfNames requires at least one member - add dummy member
+		addRequest.Attribute("member", []string{"cn=dummy"})
 	case openldapv1.GroupTypeGroupOfUniqueNames:
 		addRequest.Attribute("objectClass", []string{"groupOfUniqueNames"})
-		// groupOfUniqueNames requires at least one uniqueMember
-		if len(ldapGroup.Spec.Members) == 0 {
-			addRequest.Attribute("uniqueMember", []string{"cn=dummy"})
-		}
+		// groupOfUniqueNames requires at least one uniqueMember - add dummy member
+		addRequest.Attribute("uniqueMember", []string{"cn=dummy"})
 	default:
 		// Default to groupOfNames
 		addRequest.Attribute("objectClass", []string{"groupOfNames"})
-		if len(ldapGroup.Spec.Members) == 0 {
-			addRequest.Attribute("member", []string{"cn=dummy"})
-		}
+		addRequest.Attribute("member", []string{"cn=dummy"})
 	}
 
 	// Basic attributes
@@ -251,35 +243,6 @@ func (r *LDAPGroupReconciler) createLDAPGroup(ctx context.Context, conn *ldap.Co
 
 	if ldapGroup.Spec.Description != "" {
 		addRequest.Attribute("description", []string{ldapGroup.Spec.Description})
-	}
-
-	// Add members
-	if len(ldapGroup.Spec.Members) > 0 {
-		memberDNs := r.resolveMemberDNs(ldapServer, ldapGroup.Spec.Members)
-		switch ldapGroup.Spec.GroupType {
-		case openldapv1.GroupTypeGroupOfNames:
-			addRequest.Attribute("member", memberDNs)
-		case openldapv1.GroupTypeGroupOfUniqueNames:
-			addRequest.Attribute("uniqueMember", memberDNs)
-		case openldapv1.GroupTypePosix:
-			// For posix groups, we store memberUid (username only)
-			memberUids := make([]string, 0, len(ldapGroup.Spec.Members))
-			for _, member := range ldapGroup.Spec.Members {
-				// Extract username from DN or use as-is if it's just a username
-				if strings.Contains(member, "uid=") {
-					parts := strings.Split(member, ",")
-					if len(parts) > 0 && strings.HasPrefix(parts[0], "uid=") {
-						uid := strings.TrimPrefix(parts[0], "uid=")
-						memberUids = append(memberUids, uid)
-					}
-				} else {
-					memberUids = append(memberUids, member)
-				}
-			}
-			if len(memberUids) > 0 {
-				addRequest.Attribute("memberUid", memberUids)
-			}
-		}
 	}
 
 	// Add any additional attributes
@@ -309,32 +272,7 @@ func (r *LDAPGroupReconciler) updateLDAPGroup(ctx context.Context, conn *ldap.Co
 		modifyRequest.Replace("description", []string{ldapGroup.Spec.Description})
 	}
 
-	// Update members based on group type
-	if len(ldapGroup.Spec.Members) > 0 {
-		memberDNs := r.resolveMemberDNs(nil, ldapGroup.Spec.Members) // Pass nil for ldapServer in updates
-		switch ldapGroup.Spec.GroupType {
-		case openldapv1.GroupTypeGroupOfNames:
-			modifyRequest.Replace("member", memberDNs)
-		case openldapv1.GroupTypeGroupOfUniqueNames:
-			modifyRequest.Replace("uniqueMember", memberDNs)
-		case openldapv1.GroupTypePosix:
-			memberUids := make([]string, 0, len(ldapGroup.Spec.Members))
-			for _, member := range ldapGroup.Spec.Members {
-				if strings.Contains(member, "uid=") {
-					parts := strings.Split(member, ",")
-					if len(parts) > 0 && strings.HasPrefix(parts[0], "uid=") {
-						uid := strings.TrimPrefix(parts[0], "uid=")
-						memberUids = append(memberUids, uid)
-					}
-				} else {
-					memberUids = append(memberUids, member)
-				}
-			}
-			if len(memberUids) > 0 {
-				modifyRequest.Replace("memberUid", memberUids)
-			}
-		}
-	}
+	// Groups no longer manage members - members are managed by LDAPUser objects
 
 	// Only modify if there are changes
 	if len(modifyRequest.Changes) > 0 {
@@ -349,29 +287,6 @@ func (r *LDAPGroupReconciler) updateLDAPGroup(ctx context.Context, conn *ldap.Co
 	}
 
 	return nil
-}
-
-// resolveMemberDNs converts member specifications to full DNs
-func (r *LDAPGroupReconciler) resolveMemberDNs(ldapServer *openldapv1.LDAPServer, members []string) []string {
-	memberDNs := make([]string, 0, len(members))
-
-	for _, member := range members {
-		if strings.Contains(member, "=") {
-			// Already a DN
-			memberDNs = append(memberDNs, member)
-		} else {
-			// Convert username to DN
-			if ldapServer != nil {
-				dn := fmt.Sprintf("uid=%s,ou=users,%s", member, ldapServer.Spec.BaseDN)
-				memberDNs = append(memberDNs, dn)
-			} else {
-				// Fallback to just the username for updates where we don't have server context
-				memberDNs = append(memberDNs, member)
-			}
-		}
-	}
-
-	return memberDNs
 }
 
 // updateGroupStatus updates the group status with current member information

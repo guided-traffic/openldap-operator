@@ -204,13 +204,10 @@ var _ = Describe("Type Validation Tests", func() {
 				GroupName: "posixgroup",
 				GroupType: GroupTypePosix,
 				GroupID:   &groupID,
-				Members:   []string{"user1", "user2"},
 			}
 
 			Expect(spec.GroupType).To(Equal(GroupTypePosix))
-			Expect(*spec.GroupID).To(Equal(int32(2001)))
-			Expect(spec.Members).To(ContainElement("user1"))
-			Expect(spec.Members).To(ContainElement("user2"))
+			Expect(*spec.GroupID).To(Equal(groupID))
 		})
 	})
 
@@ -346,7 +343,6 @@ var _ = Describe("Type Validation Tests", func() {
 
 			Expect(spec.GroupName).To(Equal("minimalgroup"))
 			Expect(spec.Description).To(BeEmpty())
-			Expect(spec.Members).To(BeEmpty())
 		})
 
 		It("Should validate connection statuses", func() {

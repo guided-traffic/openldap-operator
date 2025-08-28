@@ -88,11 +88,6 @@ func (in *LDAPGroupList) DeepCopyObject() runtime.Object {
 func (in *LDAPGroupSpec) DeepCopyInto(out *LDAPGroupSpec) {
 	*out = *in
 	out.LDAPServerRef = in.LDAPServerRef
-	if in.Members != nil {
-		in, out := &in.Members, &out.Members
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	if in.GroupID != nil {
 		in, out := &in.GroupID, &out.GroupID
 		*out = new(int32)
@@ -404,6 +399,11 @@ func (in *LDAPUserStatus) DeepCopyInto(out *LDAPUserStatus) {
 	*out = *in
 	if in.Groups != nil {
 		in, out := &in.Groups, &out.Groups
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.MissingGroups != nil {
+		in, out := &in.MissingGroups, &out.MissingGroups
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}

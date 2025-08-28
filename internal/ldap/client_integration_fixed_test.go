@@ -184,7 +184,6 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypePosix,
 				GroupID:            &groupID,
-				Members:            []string{},
 			}
 
 			err := client.CreateGroup(groupSpec)
@@ -199,7 +198,6 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypePosix,
 				GroupID:            &groupID,
-				Members:            []string{},
 			}
 
 			// Create group first
@@ -220,7 +218,6 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypePosix,
 				GroupID:            &groupID,
-				Members:            []string{},
 			}
 
 			// Create group first
@@ -242,7 +239,6 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypePosix,
 				GroupID:            &groupID,
-				Members:            []string{},
 			}
 
 			// Create group first
@@ -292,7 +288,6 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypePosix,
 				GroupID:            &testGroupID,
-				Members:            []string{},
 			}
 			err = client.CreateGroup(groupSpec)
 			Expect(err).NotTo(HaveOccurred())

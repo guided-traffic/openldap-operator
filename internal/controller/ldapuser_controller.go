@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
+	ldapClient "github.com/guided-traffic/openldap-operator/internal/ldap"
 )
 
 // LDAPUserReconciler reconciles a LDAPUser object
@@ -100,6 +101,12 @@ func (r *LDAPUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	err = r.reconcileUser(ctx, conn, ldapServer, ldapUser)
 	if err != nil {
 		return r.updateStatus(ctx, ldapUser, openldapv1.UserPhaseError, fmt.Sprintf("Failed to reconcile user: %v", err))
+	}
+
+	// Reconcile user group memberships
+	err = r.reconcileUserGroups(ctx, conn, ldapServer, ldapUser)
+	if err != nil {
+		return r.updateStatus(ctx, ldapUser, openldapv1.UserPhaseError, fmt.Sprintf("Failed to reconcile user groups: %v", err))
 	}
 
 	return r.updateStatus(ctx, ldapUser, openldapv1.UserPhaseReady, "User successfully synchronized")
@@ -253,6 +260,121 @@ func (r *LDAPUserReconciler) updateLDAPUser(conn *ldap.Conn, userDN string, ldap
 	}
 
 	return conn.Modify(modifyRequest)
+}
+
+// reconcileUserGroups manages the group membership for the user
+func (r *LDAPUserReconciler) reconcileUserGroups(ctx context.Context, conn *ldap.Conn, ldapServer *openldapv1.LDAPServer, ldapUser *openldapv1.LDAPUser) error {
+	logger := log.FromContext(ctx)
+
+	// Get bind password to create LDAP client
+	bindPassword, err := r.getSecretValue(ctx, ldapServer.Namespace, ldapServer.Spec.BindPasswordSecret)
+	if err != nil {
+		return fmt.Errorf("failed to get bind password: %v", err)
+	}
+
+	// Create LDAP client using the server spec
+	client, err := ldapClient.NewClient(&ldapServer.Spec, bindPassword)
+	if err != nil {
+		return fmt.Errorf("failed to create LDAP client: %v", err)
+	}
+	defer client.Close()
+
+	userOU := ldapUser.Spec.OrganizationalUnit
+	if userOU == "" {
+		userOU = "users"
+	}
+
+	// Get current groups the user belongs to
+	currentGroups, err := client.GetUserGroups(ldapUser.Spec.Username, userOU, "groups")
+	if err != nil {
+		logger.Error(err, "Failed to get current user groups")
+		currentGroups = []string{} // Continue with empty list
+	}
+
+	// Get desired groups from spec
+	desiredGroups := ldapUser.Spec.Groups
+	if desiredGroups == nil {
+		desiredGroups = []string{}
+	}
+
+	// Check which groups exist and which are missing
+	var existingGroups []string
+	var missingGroups []string
+
+	for _, groupName := range desiredGroups {
+		exists, err := client.GroupExists(groupName, "groups")
+		if err != nil {
+			logger.Error(err, "Failed to check if group exists", "group", groupName)
+			continue
+		}
+
+		if exists {
+			existingGroups = append(existingGroups, groupName)
+		} else {
+			missingGroups = append(missingGroups, groupName)
+			logger.Info("Group does not exist in LDAP", "group", groupName, "user", ldapUser.Spec.Username)
+		}
+	}
+
+	// Add user to groups they should be in but aren't
+	for _, groupName := range existingGroups {
+		inGroup := false
+		for _, currentGroup := range currentGroups {
+			if currentGroup == groupName {
+				inGroup = true
+				break
+			}
+		}
+
+		if !inGroup {
+			// Determine group type by trying to get group info
+			groupType := openldapv1.GroupTypeGroupOfNames // Default
+			logger.Info("Adding user to group", "user", ldapUser.Spec.Username, "group", groupName)
+
+			err := client.AddUserToGroup(ldapUser.Spec.Username, userOU, groupName, "groups", groupType)
+			if err != nil {
+				logger.Error(err, "Failed to add user to group", "user", ldapUser.Spec.Username, "group", groupName)
+				// Try with different group types
+				for _, gType := range []openldapv1.GroupType{openldapv1.GroupTypePosix, openldapv1.GroupTypeGroupOfUniqueNames} {
+					err := client.AddUserToGroup(ldapUser.Spec.Username, userOU, groupName, "groups", gType)
+					if err == nil {
+						logger.Info("Successfully added user to group with type", "user", ldapUser.Spec.Username, "group", groupName, "type", gType)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Remove user from groups they shouldn't be in anymore
+	for _, currentGroup := range currentGroups {
+		shouldBeInGroup := false
+		for _, desiredGroup := range existingGroups {
+			if currentGroup == desiredGroup {
+				shouldBeInGroup = true
+				break
+			}
+		}
+
+		if !shouldBeInGroup {
+			logger.Info("Removing user from group", "user", ldapUser.Spec.Username, "group", currentGroup)
+
+			// Try different group types
+			for _, gType := range []openldapv1.GroupType{openldapv1.GroupTypeGroupOfNames, openldapv1.GroupTypePosix, openldapv1.GroupTypeGroupOfUniqueNames} {
+				err := client.RemoveUserFromGroup(ldapUser.Spec.Username, userOU, currentGroup, "groups", gType)
+				if err == nil {
+					logger.Info("Successfully removed user from group", "user", ldapUser.Spec.Username, "group", currentGroup)
+					break
+				}
+			}
+		}
+	}
+
+	// Update status with current and missing groups
+	ldapUser.Status.Groups = existingGroups
+	ldapUser.Status.MissingGroups = missingGroups
+
+	return nil
 }
 
 // updateStatus updates the status of the LDAPUser resource

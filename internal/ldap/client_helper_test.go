@@ -130,14 +130,10 @@ var _ = Describe("LDAP Client Helper Functions", func() {
 			groupSpec := &openldapv1.LDAPGroupSpec{
 				GroupName:   "testgroup",
 				Description: "Test Group",
-				Members:     []string{"user1", "user2"},
 			}
 
 			Expect(groupSpec.GroupName).To(Equal("testgroup"))
 			Expect(groupSpec.Description).To(Equal("Test Group"))
-			Expect(groupSpec.Members).To(HaveLen(2))
-			Expect(groupSpec.Members).To(ContainElement("user1"))
-			Expect(groupSpec.Members).To(ContainElement("user2"))
 		})
 
 		It("Should handle group with POSIX attributes", func() {
@@ -160,7 +156,6 @@ var _ = Describe("LDAP Client Helper Functions", func() {
 			}
 
 			Expect(groupSpec.Description).To(Equal(""))
-			Expect(groupSpec.Members).To(BeEmpty())
 			Expect(groupSpec.GroupID).To(BeNil())
 		})
 	})

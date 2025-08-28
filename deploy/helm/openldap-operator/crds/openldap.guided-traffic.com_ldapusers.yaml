@@ -217,6 +217,12 @@ spec:
                 description: Message provides additional information about the current
                   phase
                 type: string
+              missingGroups:
+                description: MissingGroups contains the list of groups that don't
+                  exist in LDAP but are specified in spec.groups
+                items:
+                  type: string
+                type: array
               observedGeneration:
                 description: ObservedGeneration represents the .metadata.generation
                   that the condition was set based upon

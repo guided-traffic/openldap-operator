@@ -56,7 +56,6 @@ func TestLDAPGroupReconciler_Reconcile(t *testing.T) {
 					GroupName:   "developers",
 					Description: "Development team",
 					GroupType:   openldapv1.GroupTypeGroupOfNames,
-					Members:     []string{"john", "jane"},
 				},
 			},
 			ldapServer: &openldapv1.LDAPServer{
@@ -182,55 +181,6 @@ func TestLDAPGroupReconciler_Reconcile(t *testing.T) {
 
 			// Check that finalizer was added
 			assert.Contains(t, updatedGroup.Finalizers, "openldap.guided-traffic.com/finalizer")
-		})
-	}
-}
-
-func TestLDAPGroupReconciler_resolveMemberDNs(t *testing.T) {
-	reconciler := &LDAPGroupReconciler{}
-
-	ldapServer := &openldapv1.LDAPServer{
-		Spec: openldapv1.LDAPServerSpec{
-			BaseDN: "dc=example,dc=com",
-		},
-	}
-
-	tests := []struct {
-		name        string
-		members     []string
-		ldapServer  *openldapv1.LDAPServer
-		expectedDNs []string
-	}{
-		{
-			name:        "usernames converted to DNs",
-			members:     []string{"john", "jane"},
-			ldapServer:  ldapServer,
-			expectedDNs: []string{"uid=john,ou=users,dc=example,dc=com", "uid=jane,ou=users,dc=example,dc=com"},
-		},
-		{
-			name:        "DNs passed through unchanged",
-			members:     []string{"uid=john,ou=users,dc=example,dc=com", "cn=admin,dc=example,dc=com"},
-			ldapServer:  ldapServer,
-			expectedDNs: []string{"uid=john,ou=users,dc=example,dc=com", "cn=admin,dc=example,dc=com"},
-		},
-		{
-			name:        "mixed usernames and DNs",
-			members:     []string{"john", "uid=jane,ou=users,dc=example,dc=com"},
-			ldapServer:  ldapServer,
-			expectedDNs: []string{"uid=john,ou=users,dc=example,dc=com", "uid=jane,ou=users,dc=example,dc=com"},
-		},
-		{
-			name:        "nil server returns usernames",
-			members:     []string{"john", "jane"},
-			ldapServer:  nil,
-			expectedDNs: []string{"john", "jane"},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := reconciler.resolveMemberDNs(tt.ldapServer, tt.members)
-			assert.Equal(t, tt.expectedDNs, result)
 		})
 	}
 }

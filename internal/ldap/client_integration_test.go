@@ -190,7 +190,6 @@ var _ = XDescribe("LDAP Client Integration Tests", func() {
 				Description:        "Test Group",
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypeGroupOfNames,
-				Members:            []string{},
 			}
 
 			err := client.CreateGroup(groupSpec)
@@ -203,7 +202,6 @@ var _ = XDescribe("LDAP Client Integration Tests", func() {
 				Description:        "Exists Test Group",
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypeGroupOfNames,
-				Members:            []string{},
 			}
 
 			// Create group first
@@ -228,7 +226,6 @@ var _ = XDescribe("LDAP Client Integration Tests", func() {
 				Description:        "Search Test Group",
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypeGroupOfNames,
-				Members:            []string{},
 			}
 
 			err := client.CreateGroup(groupSpec)
@@ -246,7 +243,6 @@ var _ = XDescribe("LDAP Client Integration Tests", func() {
 				Description:        "Delete Test Group",
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypeGroupOfNames,
-				Members:            []string{},
 			}
 
 			// Create group first
@@ -298,7 +294,6 @@ var _ = XDescribe("LDAP Client Integration Tests", func() {
 				Description:        "Member Test Group",
 				OrganizationalUnit: "groups",
 				GroupType:          v1.GroupTypeGroupOfNames,
-				Members:            []string{},
 			}
 			err = client.CreateGroup(groupSpec)
 			Expect(err).NotTo(HaveOccurred())
