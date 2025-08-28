@@ -112,3 +112,4 @@ ginkgo
 .dockerignore
 docker-compose*.yml
 docker-compose*.yaml
+main
