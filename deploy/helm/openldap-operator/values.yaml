@@ -1,0 +1,249 @@
+# Default values for openldap-operator.
+# This is a YAML-formatted file.
+# Declare variables to be substituted into your templates.
+
+# Global configuration
+global:
+  # Global image registry override
+  imageRegistry: ""
+  # Global image pull secrets
+  imagePullSecrets: []
+
+# Operator image configuration
+image:
+  registry: ""
+  repository: openldap-operator
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Image pull secrets for the operator
+imagePullSecrets: []
+
+# Override the chart name
+nameOverride: ""
+# Override the full name
+fullnameOverride: ""
+
+# Operator deployment configuration
+operator:
+  # Number of operator replicas
+  replicaCount: 1
+
+  # Leader election configuration
+  leaderElection:
+    enabled: true
+
+  # Operator arguments
+  args:
+    - --leader-elect
+    - --zap-log-level=info
+
+  # Environment variables
+  env: []
+    # - name: LOG_LEVEL
+    #   value: "info"
+
+  # Resource limits and requests
+  resources:
+    limits:
+      cpu: 500m
+      memory: 128Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+
+  # Node selector
+  nodeSelector: {}
+
+  # Tolerations
+  tolerations: []
+
+  # Affinity rules
+  affinity: {}
+
+  # Pod annotations
+  podAnnotations: {}
+
+  # Pod labels
+  podLabels: {}
+
+  # Security context for the pod
+  podSecurityContext:
+    runAsNonRoot: true
+    # fsGroup: 2000
+
+  # Security context for the container
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - "ALL"
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# RBAC configuration
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+  # Annotations to add to the ClusterRole
+  annotations: {}
+
+# Monitoring configuration
+metrics:
+  # Enable metrics endpoint
+  enabled: true
+  # Metrics service configuration
+  service:
+    # Service type
+    type: ClusterIP
+    # Service port
+    port: 8080
+    # Service annotations
+    annotations: {}
+
+  # ServiceMonitor configuration for Prometheus
+  serviceMonitor:
+    # Enable ServiceMonitor creation
+    enabled: false
+    # ServiceMonitor namespace (defaults to release namespace)
+    namespace: ""
+    # ServiceMonitor labels
+    labels: {}
+    # ServiceMonitor annotations
+    annotations: {}
+    # Scrape interval
+    interval: 30s
+    # Scrape timeout
+    scrapeTimeout: 10s
+
+# Health check configuration
+healthCheck:
+  # Liveness probe configuration
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: 8081
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Readiness probe configuration
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: 8081
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Webhook configuration (if webhooks are used)
+webhook:
+  # Enable webhook
+  enabled: false
+  # Webhook port
+  port: 9443
+  # Webhook certificate configuration
+  certManager:
+    # Use cert-manager for certificate generation
+    enabled: false
+    # Certificate issuer
+    issuer: selfsigned-issuer
+
+  # Manual certificate configuration (if cert-manager is not used)
+  certificate:
+    # TLS certificate (base64 encoded)
+    crt: ""
+    # TLS private key (base64 encoded)
+    key: ""
+
+# CRD installation configuration
+crds:
+  # Install CRDs as part of the Helm chart
+  install: true
+  # Keep CRDs when uninstalling the chart
+  keep: true
+  # CRD annotations
+  annotations: {}
+
+# Network policy configuration
+networkPolicy:
+  # Enable network policy
+  enabled: false
+  # Ingress rules
+  ingress: []
+  # Egress rules
+  egress: []
+
+# Pod disruption budget
+podDisruptionBudget:
+  # Enable PDB
+  enabled: false
+  # Minimum available pods
+  minAvailable: 1
+  # Maximum unavailable pods
+  # maxUnavailable: 1
+
+# Extra manifests to deploy
+extraManifests: []
+  # - apiVersion: v1
+  #   kind: ConfigMap
+  #   metadata:
+  #     name: extra-configmap
+  #   data:
+  #     key: value
+
+# Configuration for watching specific namespaces
+watchNamespaces: []
+  # - default
+  # - ldap-users
+
+# Default LDAP server configuration (for examples)
+examples:
+  # Enable creation of example resources
+  enabled: false
+  # Default LDAP server configuration
+  ldapServer:
+    name: example-ldap
+    namespace: default
+    host: ldap.example.com
+    port: 389
+    baseDN: dc=example,dc=com
+    bindDN: cn=admin,dc=example,dc=com
+    # Reference to secret containing bind password
+    bindPasswordSecret:
+      name: ldap-admin-secret
+      key: password
+    tls:
+      enabled: false
+      insecureSkipVerify: false
+      caCertSecret:
+        name: ""
+        key: ""
+
+# Operator configuration
+config:
+  # Log level (debug, info, warn, error)
+  logLevel: info
+  # Metrics bind address
+  metricsAddr: :8080
+  # Health probe bind address
+  probeAddr: :8081
+  # Enable development mode
+  development: false
+  # Zap time encoding (epoch, millis, nano, iso8601, rfc3339, rfc3339nano)
+  zapTimeEncoding: rfc3339
+  # Zap log encoding (json, console)
+  zapEncoder: json

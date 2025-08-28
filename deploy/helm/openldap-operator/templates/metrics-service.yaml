@@ -1,0 +1,22 @@
+{{- if .Values.metrics.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "openldap-operator.metricsServiceName" . }}
+  namespace: {{ include "openldap-operator.namespace" . }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+  {{- with .Values.metrics.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.metrics.service.type }}
+  ports:
+  - name: metrics
+    port: {{ .Values.metrics.service.port }}
+    targetPort: metrics
+    protocol: TCP
+  selector:
+    {{- include "openldap-operator.selectorLabels" . | nindent 4 }}
+{{- end }}

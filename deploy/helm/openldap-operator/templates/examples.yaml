@@ -1,0 +1,42 @@
+{{- if .Values.examples.enabled -}}
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPServer
+metadata:
+  name: {{ .Values.examples.ldapServer.name }}
+  namespace: {{ .Values.examples.ldapServer.namespace }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: example
+spec:
+  host: {{ .Values.examples.ldapServer.host }}
+  port: {{ .Values.examples.ldapServer.port }}
+  baseDN: {{ .Values.examples.ldapServer.baseDN | quote }}
+  bindDN: {{ .Values.examples.ldapServer.bindDN | quote }}
+  bindPasswordSecret:
+    name: {{ .Values.examples.ldapServer.bindPasswordSecret.name }}
+    key: {{ .Values.examples.ldapServer.bindPasswordSecret.key }}
+  {{- if .Values.examples.ldapServer.tls.enabled }}
+  tls:
+    enabled: {{ .Values.examples.ldapServer.tls.enabled }}
+    insecureSkipVerify: {{ .Values.examples.ldapServer.tls.insecureSkipVerify }}
+    {{- if .Values.examples.ldapServer.tls.caCertSecret.name }}
+    caCertSecret:
+      name: {{ .Values.examples.ldapServer.tls.caCertSecret.name }}
+      key: {{ .Values.examples.ldapServer.tls.caCertSecret.key }}
+    {{- end }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.examples.ldapServer.bindPasswordSecret.name }}
+  namespace: {{ .Values.examples.ldapServer.namespace }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: example
+type: Opaque
+data:
+  # Default password: admin123! (base64 encoded)
+  # Change this in production!
+  password: YWRtaW4xMjMh
+{{- end }}

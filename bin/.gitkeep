@@ -1,0 +1,2 @@
+# This file keeps the bin directory in git while ignoring its contents
+# Build tools will be downloaded here by the Makefile

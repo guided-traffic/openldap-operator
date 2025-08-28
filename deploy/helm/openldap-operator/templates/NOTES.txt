@@ -1,0 +1,98 @@
+1. Get the application URL by running these commands:
+{{- if .Values.metrics.enabled }}
+  export POD_NAME=$(kubectl get pods --namespace {{ include "openldap-operator.namespace" . }} -l "{{ include "openldap-operator.selectorLabels" . }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ include "openldap-operator.namespace" . }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[?(@.name=='metrics')].containerPort}")
+  echo "Visit http://127.0.0.1:8080 to view metrics"
+  kubectl --namespace {{ include "openldap-operator.namespace" . }} port-forward $POD_NAME 8080:$CONTAINER_PORT
+{{- end }}
+
+2. Check the operator status:
+  kubectl --namespace {{ include "openldap-operator.namespace" . }} get deployment {{ include "openldap-operator.fullname" . }}
+
+3. View operator logs:
+  kubectl --namespace {{ include "openldap-operator.namespace" . }} logs -l "{{ include "openldap-operator.selectorLabels" . }}" -f
+
+{{- if .Values.examples.enabled }}
+
+4. Example LDAP Server has been created:
+  kubectl --namespace {{ .Values.examples.ldapServer.namespace }} get ldapserver {{ .Values.examples.ldapServer.name }}
+
+5. To create a sample LDAP user:
+  cat <<EOF | kubectl apply -f -
+  apiVersion: openldap.guided-traffic.com/v1
+  kind: LDAPUser
+  metadata:
+    name: john-doe
+    namespace: {{ .Values.examples.ldapServer.namespace }}
+  spec:
+    ldapServerRef:
+      name: {{ .Values.examples.ldapServer.name }}
+    username: johndoe
+    firstName: John
+    lastName: Doe
+    email: john.doe@example.com
+    organizationalUnit: users
+    userID: 1001
+    groupID: 1001
+    homeDirectory: /home/johndoe
+    loginShell: /bin/bash
+    passwordSecret:
+      name: johndoe-password
+      key: password
+  EOF
+
+6. Create the password secret:
+  kubectl create secret generic johndoe-password \
+    --from-literal=password='SecurePassword123!' \
+    --namespace {{ .Values.examples.ldapServer.namespace }}
+
+{{- else }}
+
+4. To get started, create an LDAP server resource:
+  cat <<EOF | kubectl apply -f -
+  apiVersion: openldap.guided-traffic.com/v1
+  kind: LDAPServer
+  metadata:
+    name: my-ldap-server
+    namespace: default
+  spec:
+    host: ldap.example.com
+    port: 389
+    baseDN: dc=example,dc=com
+    bindDN: cn=admin,dc=example,dc=com
+    bindPasswordSecret:
+      name: ldap-admin-secret
+      key: password
+  EOF
+
+5. Create the admin password secret:
+  kubectl create secret generic ldap-admin-secret \
+    --from-literal=password='your-admin-password' \
+    --namespace default
+
+{{- end }}
+
+{{- if .Values.metrics.serviceMonitor.enabled }}
+
+6. Prometheus ServiceMonitor has been created for metrics collection.
+
+{{- end }}
+
+For more information:
+- Documentation: https://github.com/guided-traffic/openldap-operator
+- Report issues: https://github.com/guided-traffic/openldap-operator/issues
+
+{{- if .Values.webhook.enabled }}
+
+WARNING: Webhook is enabled but requires proper TLS certificate configuration.
+{{- if not .Values.webhook.certManager.enabled }}
+Make sure to provide valid TLS certificates in webhook.certificate.crt and webhook.certificate.key
+{{- end }}
+
+{{- end }}
+
+{{- if not .Values.rbac.create }}
+
+WARNING: RBAC creation is disabled. Make sure the service account has the necessary permissions.
+
+{{- end }}

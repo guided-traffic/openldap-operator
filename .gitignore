@@ -1,0 +1,114 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/*
+!bin/.gitkeep
+testbin/*
+Containerfile.cross
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Build artifacts
+_output/
+.cache/
+
+# Dependencies
+vendor/
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+*.sublime-*
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+
+# Node modules (if any)
+node_modules/
+
+# Coverage reports
+coverage.out
+coverage.html
+coverage/
+cover.out
+
+# Kubernetes test artifacts
+kubeconfig
+*.kubeconfig
+
+# Kubebuilder/Controller-runtime artifacts
+config/
+# Generated deepcopy files (keep api/v1/zz_generated.deepcopy.go for builds)
+**/zz_generated.*
+!api/v1/zz_generated.deepcopy.go
+!vendor/**/zz_generated.*
+manager
+
+# Build outputs
+dist/
+release/
+*.tar.gz
+*.zip
+
+# Generated CRDs and manifests
+*.crd.yaml
+*-crd.yaml
+
+# Test artifacts
+testbin/
+*.coverprofile
+profile.cov
+
+# Operator SDK artifacts
+bundle/
+bundle.Containerfile
+
+# Helm charts (if generated)
+charts/
+*.tgz
+
+# Generated manifests
+*.yaml.bak
+*.yml.bak
+
+# Local development
+.localdev/
+local-*
+
+# Development tools
+kustomize
+setup-envtest
+controller-gen
+ginkgo
+
+# Docker artifacts
+.dockerignore
+docker-compose*.yml
+docker-compose*.yaml

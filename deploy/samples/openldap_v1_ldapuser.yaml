@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: john-doe-password
+  namespace: default
+type: Opaque
+data:
+  password: dXNlclBhc3N3b3Jk # userPassword (base64 encoded)
+---
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPUser
+metadata:
+  labels:
+    app.kubernetes.io/name: ldapuser
+    app.kubernetes.io/instance: ldapuser-sample
+    app.kubernetes.io/part-of: openldap-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openldap-operator
+  name: john-doe
+  namespace: default
+spec:
+  ldapServerRef:
+    name: ldapserver-sample
+  username: johndoe
+  email: john.doe@example.com
+  firstName: John
+  lastName: Doe
+  displayName: John Doe
+  passwordSecret:
+    name: john-doe-password
+    key: password
+  groups:
+    - developers
+    - users
+  organizationalUnit: users
+  userID: 1001
+  groupID: 1000
+  homeDirectory: /home/johndoe
+  loginShell: /bin/bash
+  enabled: true

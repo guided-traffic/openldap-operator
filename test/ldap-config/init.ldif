@@ -1,0 +1,57 @@
+# Test data initialization for OpenLDAP
+# This LDIF file sets up organizational units and initial test data
+
+# Create organizational units
+dn: ou=users,dc=example,dc=com
+objectClass: organizationalUnit
+ou: users
+description: Users organizational unit
+
+dn: ou=groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: groups
+description: Groups organizational unit
+
+# Create a test user
+dn: uid=admin-test,ou=users,dc=example,dc=com
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+uid: admin-test
+cn: Admin Test
+sn: Test
+givenName: Admin
+mail: admin-test@example.com
+uidNumber: 1000
+gidNumber: 1000
+homeDirectory: /home/admin-test
+loginShell: /bin/bash
+userPassword: {SSHA}password123
+
+# Create a test group
+dn: cn=administrators,ou=groups,dc=example,dc=com
+objectClass: groupOfNames
+objectClass: top
+cn: administrators
+description: System administrators
+member: uid=admin-test,ou=users,dc=example,dc=com
+
+# Create another test group (posix)
+dn: cn=users,ou=groups,dc=example,dc=com
+objectClass: posixGroup
+objectClass: top
+cn: users
+description: Default users group
+gidNumber: 1000
+memberUid: admin-test
+
+# Create test organizational units for dynamic testing
+dn: ou=test-users,dc=example,dc=com
+objectClass: organizationalUnit
+ou: test-users
+description: Test users for integration testing
+
+dn: ou=test-groups,dc=example,dc=com
+objectClass: organizationalUnit
+ou: test-groups
+description: Test groups for integration testing

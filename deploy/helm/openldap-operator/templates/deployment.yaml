@@ -1,0 +1,125 @@
+{{- include "openldap-operator.validateValues" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openldap-operator.fullname" . }}
+  namespace: {{ include "openldap-operator.namespace" . }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "openldap-operator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+        {{- with .Values.operator.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "openldap-operator.selectorLabels" . | nindent 8 }}
+        {{- with .Values.operator.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with include "openldap-operator.imagePullSecrets" . }}
+      {{ . }}
+      {{- end }}
+      serviceAccountName: {{ include "openldap-operator.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}
+      containers:
+      - name: manager
+        image: {{ include "openldap-operator.image" . }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command:
+        - /manager
+        args:
+        {{- if .Values.operator.leaderElection.enabled }}
+        - --leader-elect
+        {{- end }}
+        {{- if .Values.config.metricsAddr }}
+        - --metrics-bind-address={{ .Values.config.metricsAddr }}
+        {{- end }}
+        {{- if .Values.config.probeAddr }}
+        - --health-probe-bind-address={{ .Values.config.probeAddr }}
+        {{- end }}
+        {{- if .Values.config.logLevel }}
+        - --zap-log-level={{ .Values.config.logLevel }}
+        {{- end }}
+        {{- if .Values.config.zapEncoder }}
+        - --zap-encoder={{ .Values.config.zapEncoder }}
+        {{- end }}
+        {{- if .Values.config.zapTimeEncoding }}
+        - --zap-time-encoding={{ .Values.config.zapTimeEncoding }}
+        {{- end }}
+        {{- if .Values.config.development }}
+        - --zap-devel
+        {{- end }}
+        {{- range .Values.operator.args }}
+        - {{ . }}
+        {{- end }}
+        env:
+        {{- if .Values.watchNamespaces }}
+        - name: WATCH_NAMESPACE
+          value: {{ join "," .Values.watchNamespaces | quote }}
+        {{- end }}
+        {{- range .Values.operator.env }}
+        - name: {{ .name }}
+          {{- if .value }}
+          value: {{ .value | quote }}
+          {{- else if .valueFrom }}
+          valueFrom:
+            {{- toYaml .valueFrom | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        ports:
+        - containerPort: 8081
+          name: health
+          protocol: TCP
+        {{- if .Values.metrics.enabled }}
+        - containerPort: 8080
+          name: metrics
+          protocol: TCP
+        {{- end }}
+        {{- if .Values.webhook.enabled }}
+        - containerPort: {{ .Values.webhook.port }}
+          name: webhook
+          protocol: TCP
+        {{- end }}
+        livenessProbe:
+          {{- toYaml .Values.healthCheck.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.healthCheck.readinessProbe | nindent 10 }}
+        resources:
+          {{- toYaml .Values.operator.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml .Values.operator.securityContext | nindent 10 }}
+        {{- if .Values.webhook.enabled }}
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+        {{- end }}
+      {{- if .Values.webhook.enabled }}
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: {{ include "openldap-operator.certificateName" . }}
+      {{- end }}
+      {{- with .Values.operator.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.operator.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 10

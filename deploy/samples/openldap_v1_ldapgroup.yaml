@@ -1,0 +1,22 @@
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPGroup
+metadata:
+  labels:
+    app.kubernetes.io/name: ldapgroup
+    app.kubernetes.io/instance: ldapgroup-sample
+    app.kubernetes.io/part-of: openldap-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openldap-operator
+  name: developers
+  namespace: default
+spec:
+  ldapServerRef:
+    name: ldapserver-sample
+  groupName: developers
+  description: Development team group
+  organizationalUnit: groups
+  groupID: 2000
+  groupType: groupOfNames
+  members:
+    - johndoe
+    - janedoe

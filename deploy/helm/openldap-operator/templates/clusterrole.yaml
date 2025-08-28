@@ -1,0 +1,99 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "openldap-operator.clusterRoleName" . }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+  {{- with .Values.rbac.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapservers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapservers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapusers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapusers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapusers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapgroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapgroups/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - openldap.guided-traffic.com
+  resources:
+  - ldapgroups/status
+  verbs:
+  - get
+  - patch
+  - update
+{{- end }}

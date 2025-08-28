@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ldap-admin-secret
+  namespace: default
+type: Opaque
+data:
+  password: YWRtaW5QYXNzd29yZA== # adminPassword (base64 encoded)
+---
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPServer
+metadata:
+  labels:
+    app.kubernetes.io/name: ldapserver
+    app.kubernetes.io/instance: ldapserver-sample
+    app.kubernetes.io/part-of: openldap-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openldap-operator
+  name: ldapserver-sample
+  namespace: default
+spec:
+  host: "ldap.example.com"
+  port: 389
+  bindDN: "cn=admin,dc=example,dc=com"
+  bindPasswordSecret:
+    name: ldap-admin-secret
+    key: password
+  baseDN: "dc=example,dc=com"
+  tls:
+    enabled: false
+  connectionTimeout: 30
+  healthCheckInterval: 5m

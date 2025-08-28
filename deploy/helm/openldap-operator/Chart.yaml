@@ -1,0 +1,27 @@
+apiVersion: v2
+name: openldap-operator
+description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP instances with user/group/ACL management
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/guided-traffic/openldap-operator
+icon: https://raw.githubusercontent.com/openldap/openldap/master/doc/guide/admin/openldap-logo.png
+sources:
+  - https://github.com/guided-traffic/openldap-operator
+maintainers:
+  - name: guided-traffic
+    email: info@guided-traffic.com
+keywords:
+  - openldap
+  - ldap
+  - operator
+  - kubernetes
+  - user-management
+  - directory-services
+annotations:
+  category: Infrastructure
+  licenses: Apache-2.0
+  # Images
+  operator.sdk.io/project-layout: go.kubebuilder.io/v3
+  capabilities.tbs.io/operator: "true"
+  capabilities.tbs.io/level: "Full Lifecycle"
