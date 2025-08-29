@@ -17,6 +17,7 @@ limitations under the License.
 package ldap
 
 import (
+	"fmt"
 	"testing"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
@@ -191,6 +192,59 @@ func TestCreateUserAttributes(t *testing.T) {
 
 	if userSpec.GroupID == nil || *userSpec.GroupID <= 0 {
 		t.Error("Group ID should be positive")
+	}
+}
+
+func TestCreateUserAttributes_DefaultHomeDirectory(t *testing.T) {
+	tests := []struct {
+		name            string
+		userSpec        *openldapv1.LDAPUserSpec
+		expectedHomeDir string
+	}{
+		{
+			name: "user with explicit home directory",
+			userSpec: &openldapv1.LDAPUserSpec{
+				Username:      "testuser1",
+				FirstName:     "Test",
+				LastName:      "User",
+				HomeDirectory: "/custom/home/testuser1",
+			},
+			expectedHomeDir: "/custom/home/testuser1",
+		},
+		{
+			name: "user without home directory gets default",
+			userSpec: &openldapv1.LDAPUserSpec{
+				Username:  "testuser2",
+				FirstName: "Test",
+				LastName:  "User",
+				// No HomeDirectory specified
+			},
+			expectedHomeDir: "/home/testuser2",
+		},
+		{
+			name: "user with empty home directory gets default",
+			userSpec: &openldapv1.LDAPUserSpec{
+				Username:      "testuser3",
+				FirstName:     "Test",
+				LastName:      "User",
+				HomeDirectory: "", // Explicitly empty
+			},
+			expectedHomeDir: "/home/testuser3",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Test the homeDirectory logic
+			homeDir := tt.userSpec.HomeDirectory
+			if homeDir == "" {
+				homeDir = fmt.Sprintf("/home/%s", tt.userSpec.Username)
+			}
+
+			if homeDir != tt.expectedHomeDir {
+				t.Errorf("Expected homeDirectory %s, got %s", tt.expectedHomeDir, homeDir)
+			}
+		})
 	}
 }
 

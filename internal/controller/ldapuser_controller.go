@@ -245,9 +245,15 @@ func (r *LDAPUserReconciler) createLDAPUser(ctx context.Context, conn *ldap.Conn
 	if ldapUser.Spec.GroupID != nil {
 		addRequest.Attribute("gidNumber", []string{fmt.Sprintf("%d", *ldapUser.Spec.GroupID)})
 	}
-	if ldapUser.Spec.HomeDirectory != "" {
-		addRequest.Attribute("homeDirectory", []string{ldapUser.Spec.HomeDirectory})
+	// Set homeDirectory - required for posixAccount, default to /home/<username> if not specified
+	homeDir := ldapUser.Spec.HomeDirectory
+	if homeDir == "" {
+		homeDir = fmt.Sprintf("/home/%s", ldapUser.Spec.Username)
 	}
+	addRequest.Attribute("homeDirectory", []string{homeDir})
+
+	// Update status with actual home directory
+	ldapUser.Status.ActualHomeDirectory = homeDir
 	if ldapUser.Spec.LoginShell != "" {
 		addRequest.Attribute("loginShell", []string{ldapUser.Spec.LoginShell})
 	}
@@ -286,6 +292,16 @@ func (r *LDAPUserReconciler) updateLDAPUser(conn *ldap.Conn, userDN string, ldap
 	if ldapUser.Spec.DisplayName != "" {
 		modifyRequest.Replace("displayName", []string{ldapUser.Spec.DisplayName})
 	}
+
+	// Update home directory - default to /home/<username> if not specified
+	homeDir := ldapUser.Spec.HomeDirectory
+	if homeDir == "" {
+		homeDir = fmt.Sprintf("/home/%s", ldapUser.Spec.Username)
+	}
+	modifyRequest.Replace("homeDirectory", []string{homeDir})
+
+	// Update status with actual home directory
+	ldapUser.Status.ActualHomeDirectory = homeDir
 
 	return conn.Modify(modifyRequest)
 }

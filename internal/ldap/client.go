@@ -229,12 +229,16 @@ func (c *Client) CreateUser(userSpec *openldapv1.LDAPUserSpec) error {
 		})
 	}
 
-	if userSpec.HomeDirectory != "" {
-		attrs = append(attrs, ldap.Attribute{
-			Type: "homeDirectory",
-			Vals: []string{userSpec.HomeDirectory},
-		})
+	// Set homeDirectory - required for posixAccount
+	homeDir := userSpec.HomeDirectory
+	if homeDir == "" {
+		// Default to /home/<username> if not specified
+		homeDir = fmt.Sprintf("/home/%s", userSpec.Username)
 	}
+	attrs = append(attrs, ldap.Attribute{
+		Type: "homeDirectory",
+		Vals: []string{homeDir},
+	})
 
 	if userSpec.LoginShell != "" {
 		attrs = append(attrs, ldap.Attribute{
@@ -275,10 +279,12 @@ func (c *Client) UpdateUser(userSpec *openldapv1.LDAPUserSpec) error {
 		modifyRequest.Replace("mail", []string{userSpec.Email})
 	}
 
-	// Update home directory if provided
-	if userSpec.HomeDirectory != "" {
-		modifyRequest.Replace("homeDirectory", []string{userSpec.HomeDirectory})
+	// Update home directory - default to /home/<username> if not specified
+	homeDir := userSpec.HomeDirectory
+	if homeDir == "" {
+		homeDir = fmt.Sprintf("/home/%s", userSpec.Username)
 	}
+	modifyRequest.Replace("homeDirectory", []string{homeDir})
 
 	// Update login shell if provided
 	if userSpec.LoginShell != "" {

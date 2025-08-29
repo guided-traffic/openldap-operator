@@ -91,6 +91,9 @@ type LDAPUserStatus struct {
 	// DN is the full distinguished name of the user in LDAP
 	DN string `json:"dn,omitempty"`
 
+	// ActualHomeDirectory is the home directory that was actually set in LDAP (may be auto-generated)
+	ActualHomeDirectory string `json:"actualHomeDirectory,omitempty"`
+
 	// Groups contains the list of groups the user currently belongs to
 	Groups []string `json:"groups,omitempty"`
 

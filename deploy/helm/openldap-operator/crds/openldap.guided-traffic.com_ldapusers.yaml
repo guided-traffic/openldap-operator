@@ -142,6 +142,10 @@ spec:
           status:
             description: LDAPUserStatus defines the observed state of LDAPUser
             properties:
+              actualHomeDirectory:
+                description: ActualHomeDirectory is the home directory that was actually
+                  set in LDAP (may be auto-generated)
+                type: string
               conditions:
                 description: Conditions represent the latest available observations
                   of the user's state

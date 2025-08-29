@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: jane-smith-password
+  namespace: default
+type: Opaque
+data:
+  password: dXNlclBhc3N3b3Jk # userPassword (base64 encoded)
+---
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPUser
+metadata:
+  labels:
+    app.kubernetes.io/name: ldapuser
+    app.kubernetes.io/instance: ldapuser-auto-homedir
+    app.kubernetes.io/part-of: openldap-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openldap-operator
+  name: jane-smith
+  namespace: default
+spec:
+  ldapServerRef:
+    name: ldapserver-sample
+  username: janesmith
+  email: jane.smith@example.com
+  firstName: Jane
+  lastName: Smith
+  displayName: Jane Smith
+  passwordSecret:
+    name: jane-smith-password
+    key: password
+  groups:
+    - users
+  organizationalUnit: users
+  userID: 1002
+  groupID: 1000
+  # homeDirectory wird automatisch auf /home/janesmith gesetzt
+  # wenn es nicht angegeben wird
+  loginShell: /bin/bash
+  enabled: true
