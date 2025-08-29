@@ -15,11 +15,29 @@ func TestDefaults(t *testing.T) {
 
 var _ = Describe("SetDefaults Functions", func() {
 	Context("LDAPServer SetDefaults", func() {
-		It("Should set default port 389 for non-TLS connections", func() {
+		It("Should set default TLS enabled and port 636", func() {
 			spec := &LDAPServerSpec{
 				Host:   "localhost",
 				BindDN: "cn=admin,dc=example,dc=com",
 				BaseDN: "dc=example,dc=com",
+			}
+
+			spec.SetDefaults()
+
+			Expect(spec.TLS).NotTo(BeNil())
+			Expect(spec.TLS.Enabled).To(BeTrue())
+			Expect(spec.Port).To(Equal(int32(636)))
+			Expect(spec.ConnectionTimeout).To(Equal(int32(30)))
+		})
+
+		It("Should set default port 389 for explicitly disabled TLS", func() {
+			spec := &LDAPServerSpec{
+				Host:   "localhost",
+				BindDN: "cn=admin,dc=example,dc=com",
+				BaseDN: "dc=example,dc=com",
+				TLS: &TLSConfig{
+					Enabled: false,
+				},
 			}
 
 			spec.SetDefaults()

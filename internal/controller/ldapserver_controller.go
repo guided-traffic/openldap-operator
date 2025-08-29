@@ -145,10 +145,26 @@ func (r *LDAPServerReconciler) testConnection(ctx context.Context, ldapServer *o
 	var conn *ldap.Conn
 	address := fmt.Sprintf("%s:%d", ldapServer.Spec.Host, ldapServer.Spec.Port)
 
-	if ldapServer.Spec.TLS != nil && ldapServer.Spec.TLS.Enabled {
+	// TLS Logic: TLS is enabled by default, only disabled if explicitly set to false
+	useTLS := true // Default to TLS
+	if ldapServer.Spec.TLS != nil && !ldapServer.Spec.TLS.Enabled {
+		useTLS = false // Only disable if explicitly set to false
+	}
+
+	// Create connection based on TLS configuration
+	if useTLS {
 		tlsConfig := &tls.Config{
-			InsecureSkipVerify: ldapServer.Spec.TLS.InsecureSkipVerify,
+			ServerName: ldapServer.Spec.Host,
 		}
+
+		// Configure TLS settings if TLS config is provided
+		if ldapServer.Spec.TLS != nil {
+			tlsConfig.InsecureSkipVerify = ldapServer.Spec.TLS.InsecureSkipVerify
+		} else {
+			// Default TLS settings when no config is provided
+			tlsConfig.InsecureSkipVerify = false
+		}
+
 		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
 	} else {
 		conn, err = ldap.Dial("tcp", address)

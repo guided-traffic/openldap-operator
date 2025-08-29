@@ -39,16 +39,28 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 
 	address := fmt.Sprintf("%s:%d", spec.Host, spec.Port)
 
+	// TLS Logic: TLS is enabled by default, only disabled if explicitly set to false
+	useTLS := true // Default to TLS
+	if spec.TLS != nil && !spec.TLS.Enabled {
+		useTLS = false // Only disable if explicitly set to false
+	}
+
 	// Create connection based on TLS configuration
-	if spec.TLS != nil && spec.TLS.Enabled {
+	if useTLS {
 		tlsConfig := &tls.Config{
-			ServerName:         spec.Host,
-			InsecureSkipVerify: spec.TLS.InsecureSkipVerify,
+			ServerName: spec.Host,
 		}
-		// Use DialTLS with timeout
+
+		// Configure TLS settings if TLS config is provided
+		if spec.TLS != nil {
+			tlsConfig.InsecureSkipVerify = spec.TLS.InsecureSkipVerify
+		} else {
+			// Default TLS settings when no config is provided
+			tlsConfig.InsecureSkipVerify = false
+		}
+
 		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
 	} else {
-		// Use Dial with timeout
 		conn, err = ldap.Dial("tcp", address)
 	}
 
@@ -123,11 +135,26 @@ func (c *Client) ensureConnection() error {
 		var conn *ldap.Conn
 		address := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
 
-		if c.config.TLS != nil && c.config.TLS.Enabled {
+		// TLS Logic: TLS is enabled by default, only disabled if explicitly set to false
+		useTLS := true // Default to TLS
+		if c.config.TLS != nil && !c.config.TLS.Enabled {
+			useTLS = false // Only disable if explicitly set to false
+		}
+
+		// Create connection based on TLS configuration
+		if useTLS {
 			tlsConfig := &tls.Config{
-				ServerName:         c.config.Host,
-				InsecureSkipVerify: c.config.TLS.InsecureSkipVerify,
+				ServerName: c.config.Host,
 			}
+
+			// Configure TLS settings if TLS config is provided
+			if c.config.TLS != nil {
+				tlsConfig.InsecureSkipVerify = c.config.TLS.InsecureSkipVerify
+			} else {
+				// Default TLS settings when no config is provided
+				tlsConfig.InsecureSkipVerify = false
+			}
+
 			conn, err = ldap.DialTLS("tcp", address, tlsConfig)
 		} else {
 			conn, err = ldap.Dial("tcp", address)

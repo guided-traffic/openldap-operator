@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
@@ -130,9 +131,36 @@ func (r *LDAPUserReconciler) getLDAPServer(ctx context.Context, ldapUser *openld
 
 // connectToLDAP establishes a connection to the LDAP server
 func (r *LDAPUserReconciler) connectToLDAP(ctx context.Context, ldapServer *openldapv1.LDAPServer) (*ldap.Conn, error) {
-	// This is a simplified version - in reality, you'd reuse the connection logic from LDAPServerReconciler
+	var conn *ldap.Conn
+	var err error
+
 	address := fmt.Sprintf("%s:%d", ldapServer.Spec.Host, ldapServer.Spec.Port)
-	conn, err := ldap.Dial("tcp", address)
+
+	// TLS Logic: TLS is enabled by default, only disabled if explicitly set to false
+	useTLS := true // Default to TLS
+	if ldapServer.Spec.TLS != nil && !ldapServer.Spec.TLS.Enabled {
+		useTLS = false // Only disable if explicitly set to false
+	}
+
+	// Create connection based on TLS configuration
+	if useTLS {
+		tlsConfig := &tls.Config{
+			ServerName: ldapServer.Spec.Host,
+		}
+
+		// Configure TLS settings if TLS config is provided
+		if ldapServer.Spec.TLS != nil {
+			tlsConfig.InsecureSkipVerify = ldapServer.Spec.TLS.InsecureSkipVerify
+		} else {
+			// Default TLS settings when no config is provided
+			tlsConfig.InsecureSkipVerify = false
+		}
+
+		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+	} else {
+		conn, err = ldap.Dial("tcp", address)
+	}
+
 	if err != nil {
 		return nil, err
 	}

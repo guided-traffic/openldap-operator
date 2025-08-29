@@ -205,6 +205,14 @@ func isValidGroupType(groupType GroupType) bool {
 
 // SetDefaults sets default values for LDAPServerSpec
 func (s *LDAPServerSpec) SetDefaults() {
+	// Initialize TLS config if nil (defaults to enabled)
+	if s.TLS == nil {
+		s.TLS = &TLSConfig{
+			Enabled:            true,  // TLS enabled by default
+			InsecureSkipVerify: false, // Secure by default, but can be overridden
+		}
+	}
+
 	if s.Port == 0 {
 		if s.TLS != nil && s.TLS.Enabled {
 			s.Port = 636 // Default LDAPS port
