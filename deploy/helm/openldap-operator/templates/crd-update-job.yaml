@@ -33,28 +33,28 @@ spec:
         - |
           set -e
           echo "Updating OpenLDAP Operator CRDs..."
-          
+
           # Create temporary directory for CRD files
           mkdir -p /tmp/crds
-          
+
           # Write CRD files
           cat > /tmp/crds/ldapservers.yaml << 'EOF'
 {{ .Files.Get "crds/openldap.guided-traffic.com_ldapservers.yaml" | indent 10 }}
           EOF
-          
+
           cat > /tmp/crds/ldapusers.yaml << 'EOF'
 {{ .Files.Get "crds/openldap.guided-traffic.com_ldapusers.yaml" | indent 10 }}
           EOF
-          
+
           cat > /tmp/crds/ldapgroups.yaml << 'EOF'
 {{ .Files.Get "crds/openldap.guided-traffic.com_ldapgroups.yaml" | indent 10 }}
           EOF
-          
+
           # Apply CRDs
           kubectl apply -f /tmp/crds/ldapservers.yaml
-          kubectl apply -f /tmp/crds/ldapusers.yaml  
+          kubectl apply -f /tmp/crds/ldapusers.yaml
           kubectl apply -f /tmp/crds/ldapgroups.yaml
-          
+
           echo "CRDs updated successfully!"
         securityContext:
           allowPrivilegeEscalation: false
