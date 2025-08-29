@@ -110,6 +110,27 @@ The chart includes the following CRDs:
 - `LDAPUser` - Represents an LDAP user to be managed
 - `LDAPGroup` - Represents an LDAP group to be managed
 
+#### CRD Upgrades
+
+By default, Helm does not upgrade CRDs during chart upgrades. This chart includes an automatic CRD update mechanism using Helm hooks that runs before each upgrade to ensure your CRDs are always up-to-date.
+
+The CRD update feature can be controlled via the following parameters:
+
+| Name                              | Description                                    | Value           |
+| --------------------------------- | ---------------------------------------------- | --------------- |
+| `crdUpdate.enabled`               | Enable automatic CRD updates during upgrades  | `true`          |
+| `crdUpdate.image.repository`      | Image for the CRD update job                   | `bitnami/kubectl` |
+| `crdUpdate.image.tag`             | Image tag for the CRD update job               | `1.28`          |
+| `crdUpdate.resources.limits.cpu`  | CPU limit for the CRD update job               | `100m`          |
+| `crdUpdate.resources.limits.memory` | Memory limit for the CRD update job          | `64Mi`          |
+
+To disable automatic CRD updates:
+```bash
+helm upgrade openldap-operator ./deploy/helm/openldap-operator --set crdUpdate.enabled=false
+```
+
+**Note**: The CRD update job requires cluster-admin permissions to update CustomResourceDefinitions. The chart creates the necessary RBAC resources automatically.
+
 ### RBAC
 
 By default, the chart creates RBAC resources including:

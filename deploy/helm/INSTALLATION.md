@@ -137,6 +137,43 @@ helm install openldap-operator deploy/helm/openldap-operator -f values.yaml
 
 ## Upgrade and Rollback
 
+### CRD Updates
+
+Starting with version 1.0.2, the chart includes automatic CRD updates during Helm upgrades. This ensures that CustomResourceDefinitions are always synchronized with the operator version.
+
+**How it works:**
+- Before each `helm upgrade`, a pre-upgrade hook job runs
+- The job applies the latest CRD definitions from the chart
+- The job is automatically cleaned up after successful completion
+
+**Configuration:**
+```bash
+# Enable CRD updates (default: true)
+helm upgrade openldap-operator deploy/helm/openldap-operator \
+  --set crdUpdate.enabled=true
+
+# Disable CRD updates if you manage them separately
+helm upgrade openldap-operator deploy/helm/openldap-operator \
+  --set crdUpdate.enabled=false
+
+# Use custom kubectl image for CRD updates
+helm upgrade openldap-operator deploy/helm/openldap-operator \
+  --set crdUpdate.image.repository=my-registry/kubectl \
+  --set crdUpdate.image.tag=1.28.4
+```
+
+**Manual CRD Updates:**
+If you prefer to manage CRDs manually or the automatic update fails:
+```bash
+# Apply CRDs directly
+kubectl apply -f deploy/helm/openldap-operator/crds/
+
+# Or use kubectl with the chart
+helm template openldap-operator deploy/helm/openldap-operator | \
+  grep -A 1000 "kind: CustomResourceDefinition" | \
+  kubectl apply -f -
+```
+
 ### Upgrade Installation
 
 ```bash

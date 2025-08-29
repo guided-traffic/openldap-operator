@@ -1,0 +1,127 @@
+{{- if .Values.crdUpdate.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: "{{ include "openldap-operator.fullname" . }}-crd-update"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-update
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "openldap-operator.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: crd-update
+    spec:
+      restartPolicy: Never
+      serviceAccountName: "{{ include "openldap-operator.fullname" . }}-crd-update"
+      containers:
+      - name: kubectl
+        image: "{{ .Values.crdUpdate.image.repository }}:{{ .Values.crdUpdate.image.tag }}"
+        imagePullPolicy: {{ .Values.crdUpdate.image.pullPolicy }}
+        command:
+        - /bin/sh
+        - -c
+        - |
+          set -e
+          echo "Updating OpenLDAP Operator CRDs..."
+          
+          # Create temporary directory for CRD files
+          mkdir -p /tmp/crds
+          
+          # Write CRD files
+          cat > /tmp/crds/ldapservers.yaml << 'EOF'
+{{ .Files.Get "crds/openldap.guided-traffic.com_ldapservers.yaml" | indent 10 }}
+          EOF
+          
+          cat > /tmp/crds/ldapusers.yaml << 'EOF'
+{{ .Files.Get "crds/openldap.guided-traffic.com_ldapusers.yaml" | indent 10 }}
+          EOF
+          
+          cat > /tmp/crds/ldapgroups.yaml << 'EOF'
+{{ .Files.Get "crds/openldap.guided-traffic.com_ldapgroups.yaml" | indent 10 }}
+          EOF
+          
+          # Apply CRDs
+          kubectl apply -f /tmp/crds/ldapservers.yaml
+          kubectl apply -f /tmp/crds/ldapusers.yaml  
+          kubectl apply -f /tmp/crds/ldapgroups.yaml
+          
+          echo "CRDs updated successfully!"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        resources:
+          {{- toYaml .Values.crdUpdate.resources | nindent 10 }}
+      {{- with .Values.crdUpdate.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdUpdate.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.crdUpdate.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "{{ include "openldap-operator.fullname" . }}-crd-update"
+  namespace: {{ .Release.Namespace | quote }}
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-update
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: "{{ include "openldap-operator.fullname" . }}-crd-update"
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-update
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+rules:
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: "{{ include "openldap-operator.fullname" . }}-crd-update"
+  labels:
+    {{- include "openldap-operator.labels" . | nindent 4 }}
+    app.kubernetes.io/component: crd-update
+  annotations:
+    "helm.sh/hook": pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: "{{ include "openldap-operator.fullname" . }}-crd-update"
+subjects:
+- kind: ServiceAccount
+  name: "{{ include "openldap-operator.fullname" . }}-crd-update"
+  namespace: {{ .Release.Namespace | quote }}
+{{- end }}

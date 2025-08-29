@@ -182,6 +182,30 @@ crds:
   # CRD annotations
   annotations: {}
 
+# CRD update configuration for Helm upgrades
+crdUpdate:
+  # Enable CRD update job during helm upgrades
+  enabled: true
+  # Image for the CRD update job (uses kubectl)
+  image:
+    repository: bitnami/kubectl
+    tag: "1.28"
+    pullPolicy: IfNotPresent
+  # Resource limits for the CRD update job
+  resources:
+    limits:
+      cpu: 100m
+      memory: 64Mi
+    requests:
+      cpu: 10m
+      memory: 32Mi
+  # Node selector for the CRD update job
+  nodeSelector: {}
+  # Tolerations for the CRD update job
+  tolerations: []
+  # Affinity rules for the CRD update job
+  affinity: {}
+
 # Network policy configuration
 networkPolicy:
   # Enable network policy
