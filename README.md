@@ -21,10 +21,11 @@ The OpenLDAP Operator allows you to:
 - **Namespaced Resources**: All custom resources are namespaced for multi-tenancy
 - **Connection Management**: Automatic connection monitoring and status reporting
 - **User Management**: Create, update, and delete LDAP users with POSIX support
-- **Group Management**: Manage LDAP groups (posixGroup, groupOfNames, groupOfUniqueNames) and memberships
+- **Automatic Home Directories**: Auto-generates `/home/<username>` if not specified for POSIX accounts
+- **Group Management**: Manage LDAP groups (posixGroup, groupOfNames, groupOfUniqueNames) with membership via LDAPUser resources
 - **ACL Support**: Configure search users with appropriate permissions
 - **Status Tracking**: Real-time status updates for all managed resources
-- **TLS Support**: Secure connections with configurable TLS settings
+- **TLS Support**: Secure connections with configurable TLS settings (enabled by default)
 - **Comprehensive Testing**: 90.6% test coverage with Docker-based integration tests
 - **Production Ready**: Robust error handling and connection management
 
@@ -58,7 +59,7 @@ status:
 
 ### LDAPUser
 
-Represents an LDAP user with reference to a specific LDAP server.
+Represents an LDAP user with reference to a specific LDAP server. Includes automatic home directory configuration for POSIX accounts.
 
 ```yaml
 apiVersion: openldap.guided-traffic.com/v1
@@ -76,14 +77,20 @@ spec:
   groups:
     - developers
     - users
+  # homeDirectory: /home/johndoe  # Optional - auto-generated if not specified
+  userID: 1001
+  groupID: 1000
 status:
   phase: Ready
+  actualHomeDirectory: /home/johndoe  # Shows the actual home directory used
   conditions: []
 ```
 
+**Note**: If `homeDirectory` is not specified or empty, it will automatically be set to `/home/<username>` to ensure POSIX compliance.
+
 ### LDAPGroup
 
-Represents an LDAP group with reference to a specific LDAP server.
+Represents an LDAP group with reference to a specific LDAP server. Group membership is managed through the `groups` field in LDAPUser resources.
 
 ```yaml
 apiVersion: openldap.guided-traffic.com/v1
@@ -99,11 +106,13 @@ spec:
   organizationalUnit: groups
   groupType: posixGroup
   groupID: 2001
-  members:
-    - johndoe
-    - janedoe
+  # Note: Group membership is managed via LDAPUser.spec.groups
 status:
   phase: Ready
+  members: # List of current members (read-only)
+    - johndoe
+    - janedoe
+  memberCount: 2
   conditions: []
 ```
 
@@ -180,8 +189,22 @@ spec:
   organizationalUnit: groups
   groupType: posixGroup
   groupID: 9001
-  members:
-    - searchuser
+  # Note: Add the searchuser to this group by updating the LDAPUser resource
+```
+
+Then update your search user to include this group:
+
+```yaml
+# Update the LDAPUser to include group membership
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPUser
+metadata:
+  name: app-searchuser
+  namespace: myapp-namespace
+spec:
+  # ... existing spec fields ...
+  groups:
+    - search-users  # Add the user to the search-users group
 ```
 
 #### 4. Application Configuration

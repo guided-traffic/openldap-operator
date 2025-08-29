@@ -230,9 +230,21 @@ spec:
   organizationalUnit: groups
   groupID: 2000
   groupType: groupOfNames
-  members:
-    - johndoe
-    - janedoe
+  # Note: Group membership is managed via LDAPUser.spec.groups
+```
+
+To add users to this group, update the LDAPUser resources:
+
+```yaml
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPUser
+metadata:
+  name: john-doe
+spec:
+  username: johndoe
+  groups:
+    - developers  # Add user to the developers group
+  # ... other fields
 ```
 
 ### TLS Configuration
