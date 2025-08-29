@@ -121,12 +121,20 @@ The CRD update feature can be controlled via the following parameters:
 | `crdUpdate.enabled`               | Enable automatic CRD updates during upgrades  | `true`          |
 | `crdUpdate.image.repository`      | Image for the CRD update job                   | `bitnami/kubectl` |
 | `crdUpdate.image.tag`             | Image tag for the CRD update job               | `1.28`          |
+| `crdUpdate.podLabels`             | Additional labels for the CRD update job pods  | `{}`            |
 | `crdUpdate.resources.limits.cpu`  | CPU limit for the CRD update job               | `100m`          |
 | `crdUpdate.resources.limits.memory` | Memory limit for the CRD update job          | `64Mi`          |
 
 To disable automatic CRD updates:
 ```bash
 helm upgrade openldap-operator ./deploy/helm/openldap-operator --set crdUpdate.enabled=false
+```
+
+To add custom labels to the CRD update job pods:
+```bash
+helm upgrade openldap-operator ./deploy/helm/openldap-operator \
+  --set crdUpdate.podLabels.environment=production \
+  --set crdUpdate.podLabels.team=infrastructure
 ```
 
 **Note**: The CRD update job requires cluster-admin permissions to update CustomResourceDefinitions. The chart creates the necessary RBAC resources automatically.

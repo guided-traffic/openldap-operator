@@ -160,6 +160,12 @@ helm upgrade openldap-operator deploy/helm/openldap-operator \
 helm upgrade openldap-operator deploy/helm/openldap-operator \
   --set crdUpdate.image.repository=my-registry/kubectl \
   --set crdUpdate.image.tag=1.28.4
+
+# Add custom labels to CRD update job pods
+helm upgrade openldap-operator deploy/helm/openldap-operator \
+  --set crdUpdate.podLabels.environment=production \
+  --set crdUpdate.podLabels.team=infrastructure \
+  --set crdUpdate.podLabels.cost-center=engineering
 ```
 
 **Manual CRD Updates:**

@@ -17,6 +17,9 @@ spec:
       labels:
         {{- include "openldap-operator.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: crd-update
+        {{- with .Values.crdUpdate.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: Never
       serviceAccountName: "{{ include "openldap-operator.fullname" . }}-crd-update"

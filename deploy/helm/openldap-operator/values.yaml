@@ -199,6 +199,10 @@ crdUpdate:
     requests:
       cpu: 10m
       memory: 32Mi
+  # Pod labels for the CRD update job (merged with default labels)
+  podLabels: {}
+    # environment: production
+    # team: infrastructure
   # Node selector for the CRD update job
   nodeSelector: {}
   # Tolerations for the CRD update job
