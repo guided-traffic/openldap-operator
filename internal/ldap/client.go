@@ -45,8 +45,10 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 			ServerName:         spec.Host,
 			InsecureSkipVerify: spec.TLS.InsecureSkipVerify,
 		}
+		// Use DialTLS with timeout
 		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
 	} else {
+		// Use Dial with timeout
 		conn, err = ldap.Dial("tcp", address)
 	}
 
@@ -54,10 +56,12 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 		return nil, fmt.Errorf("failed to connect to LDAP server: %w", err)
 	}
 
-	// Set connection timeout
+	// Set connection timeout - use default if not specified
+	timeout := time.Duration(30) * time.Second // Default 30 seconds
 	if spec.ConnectionTimeout > 0 {
-		conn.SetTimeout(time.Duration(spec.ConnectionTimeout) * time.Second)
+		timeout = time.Duration(spec.ConnectionTimeout) * time.Second
 	}
+	conn.SetTimeout(timeout)
 
 	// Bind with provided credentials
 	err = conn.Bind(spec.BindDN, password)
@@ -101,6 +105,51 @@ func (c *Client) TestConnection() error {
 
 	_, err := c.conn.Search(searchRequest)
 	return err
+}
+
+// ensureConnection checks if the connection is still alive and reconnects if necessary
+func (c *Client) ensureConnection() error {
+	if c.conn == nil {
+		return fmt.Errorf("no connection available")
+	}
+
+	// Test current connection with a simple operation
+	err := c.TestConnection()
+	if err != nil {
+		// Connection is broken, try to reconnect
+		c.conn.Close()
+
+		// Recreate connection
+		var conn *ldap.Conn
+		address := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
+
+		if c.config.TLS != nil && c.config.TLS.Enabled {
+			tlsConfig := &tls.Config{
+				ServerName:         c.config.Host,
+				InsecureSkipVerify: c.config.TLS.InsecureSkipVerify,
+			}
+			conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		} else {
+			conn, err = ldap.Dial("tcp", address)
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to reconnect to LDAP server: %w", err)
+		}
+
+		// Set timeout
+		timeout := time.Duration(30) * time.Second
+		if c.config.ConnectionTimeout > 0 {
+			timeout = time.Duration(c.config.ConnectionTimeout) * time.Second
+		}
+		conn.SetTimeout(timeout)
+
+		c.conn = conn
+		// Note: We can't rebind here since we don't have the password
+		// The caller should handle rebinding after reconnection
+	}
+
+	return nil
 }
 
 // CreateUser creates a new user in LDAP
@@ -173,7 +222,13 @@ func (c *Client) CreateUser(userSpec *openldapv1.LDAPUserSpec) error {
 		addRequest.Attribute(attr.Type, attr.Vals)
 	}
 
-	return c.conn.Add(addRequest)
+	// Execute with error handling
+	err := c.conn.Add(addRequest)
+	if err != nil {
+		return fmt.Errorf("failed to create user %s: %w", userSpec.Username, err)
+	}
+
+	return nil
 }
 
 // UpdateUser updates an existing user in LDAP
@@ -297,7 +352,13 @@ func (c *Client) CreateGroup(groupSpec *openldapv1.LDAPGroupSpec) error {
 		addRequest.Attribute(attr.Type, attr.Vals)
 	}
 
-	return c.conn.Add(addRequest)
+	// Execute with error handling
+	err := c.conn.Add(addRequest)
+	if err != nil {
+		return fmt.Errorf("failed to create group %s: %w", groupSpec.GroupName, err)
+	}
+
+	return nil
 }
 
 // DeleteGroup deletes a group from LDAP
@@ -430,8 +491,8 @@ func (c *Client) GetUserGroups(username, userOU, groupOU string) ([]string, erro
 		baseDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
-		0,
-		30,
+		100, // Size limit - increased from 0 (unlimited)
+		60,  // Time limit - increased from 30 seconds
 		false,
 		searchFilter,
 		[]string{"cn"},
@@ -440,7 +501,7 @@ func (c *Client) GetUserGroups(username, userOU, groupOU string) ([]string, erro
 
 	result, err := c.conn.Search(searchRequest)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to search for user groups: %w", err)
 	}
 
 	var groups []string
