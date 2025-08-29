@@ -327,6 +327,7 @@ func TestUserPhase_String(t *testing.T) {
 	}{
 		{UserPhasePending, "Pending"},
 		{UserPhaseReady, "Ready"},
+		{UserPhaseWarning, "Warning"},
 		{UserPhaseError, "Error"},
 		{UserPhaseDeleting, "Deleting"},
 	}

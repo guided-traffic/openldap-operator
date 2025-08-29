@@ -238,6 +238,7 @@ spec:
                 enum:
                 - Pending
                 - Ready
+                - Warning
                 - Error
                 - Deleting
                 type: string

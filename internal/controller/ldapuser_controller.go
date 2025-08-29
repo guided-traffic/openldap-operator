@@ -20,6 +20,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-ldap/ldap/v3"
@@ -110,7 +111,21 @@ func (r *LDAPUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		return r.updateStatus(ctx, ldapUser, openldapv1.UserPhaseError, fmt.Sprintf("Failed to reconcile user groups: %v", err))
 	}
 
-	return r.updateStatus(ctx, ldapUser, openldapv1.UserPhaseReady, "User successfully synchronized")
+	// Determine final status based on missing groups
+	var finalPhase openldapv1.UserPhase
+	var finalMessage string
+
+	if len(ldapUser.Status.MissingGroups) > 0 {
+		finalPhase = openldapv1.UserPhaseWarning
+		finalMessage = fmt.Sprintf("User synchronized with warnings: %d missing groups (%s)",
+			len(ldapUser.Status.MissingGroups),
+			strings.Join(ldapUser.Status.MissingGroups, ", "))
+	} else {
+		finalPhase = openldapv1.UserPhaseReady
+		finalMessage = "User successfully synchronized"
+	}
+
+	return r.updateStatus(ctx, ldapUser, finalPhase, finalMessage)
 }
 
 // getLDAPServer retrieves the referenced LDAP server
@@ -438,8 +453,12 @@ func (r *LDAPUserReconciler) updateStatus(ctx context.Context, ldapUser *openlda
 		Message:            message,
 	}
 
-	if phase == openldapv1.UserPhaseReady {
+	if phase == openldapv1.UserPhaseReady || phase == openldapv1.UserPhaseWarning {
 		condition.Status = metav1.ConditionTrue
+		if phase == openldapv1.UserPhaseWarning {
+			condition.Type = "Ready"
+			condition.Reason = "ReadyWithWarnings"
+		}
 	}
 
 	// Update or add the condition

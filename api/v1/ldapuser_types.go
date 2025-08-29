@@ -82,7 +82,7 @@ type LDAPServerReference struct {
 // LDAPUserStatus defines the observed state of LDAPUser
 type LDAPUserStatus struct {
 	// Phase represents the current lifecycle phase of the LDAP user
-	// +kubebuilder:validation:Enum=Pending;Ready;Error;Deleting
+	// +kubebuilder:validation:Enum=Pending;Ready;Warning;Error;Deleting
 	Phase UserPhase `json:"phase,omitempty"`
 
 	// Message provides additional information about the current phase
@@ -118,6 +118,8 @@ const (
 	UserPhasePending UserPhase = "Pending"
 	// UserPhaseReady indicates the user is successfully created and synchronized
 	UserPhaseReady UserPhase = "Ready"
+	// UserPhaseWarning indicates the user is created but some groups are missing
+	UserPhaseWarning UserPhase = "Warning"
 	// UserPhaseError indicates there was an error managing the user
 	UserPhaseError UserPhase = "Error"
 	// UserPhaseDeleting indicates the user is being deleted
