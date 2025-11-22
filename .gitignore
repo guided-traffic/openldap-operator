@@ -14,6 +14,11 @@ Containerfile.cross
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+coverage.out
+coverage/
+
+# Security scan reports
+gosec-report.json
 
 # Kubernetes Generated files - skip generated files, except for vendored files
 !vendor/**/zz_generated.*
@@ -113,3 +118,4 @@ ginkgo
 docker-compose*.yml
 docker-compose*.yaml
 main
+gosec-report.json

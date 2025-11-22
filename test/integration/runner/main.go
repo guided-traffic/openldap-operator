@@ -98,6 +98,10 @@ type TestSuite struct {
 
 // NewTestSuite creates a new test suite
 func NewTestSuite(config *TestConfig) (*TestSuite, error) {
+	// Validate port range to prevent overflow
+	if config.LDAPPort < 0 || config.LDAPPort > 65535 {
+		return nil, fmt.Errorf("invalid port number: %d", config.LDAPPort)
+	}
 	spec := &openldapv1.LDAPServerSpec{
 		Host:              config.LDAPHost,
 		Port:              int32(config.LDAPPort),
@@ -306,7 +310,9 @@ func (ts *TestSuite) testGroupMembership() error {
 	if err := ts.client.CreateUser(userSpec); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
-	defer ts.client.DeleteUser(testUsername, "users")
+	defer func() {
+		_ = ts.client.DeleteUser(testUsername, "users")
+	}()
 
 	// Create group
 	groupSpec := &openldapv1.LDAPGroupSpec{
@@ -318,7 +324,9 @@ func (ts *TestSuite) testGroupMembership() error {
 	if err := ts.client.CreateGroup(groupSpec); err != nil {
 		return fmt.Errorf("failed to create group: %w", err)
 	}
-	defer ts.client.DeleteGroup(testGroupName, "groups")
+	defer func() {
+		_ = ts.client.DeleteGroup(testGroupName, "groups")
+	}()
 
 	// Add user to group
 	if err := ts.client.AddUserToGroup(testUsername, "users", testGroupName, "groups", openldapv1.GroupTypeGroupOfNames); err != nil {

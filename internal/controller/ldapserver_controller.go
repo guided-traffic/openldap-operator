@@ -152,9 +152,18 @@ func (r *LDAPServerReconciler) testConnection(ctx context.Context, ldapServer *o
 	}
 
 	// Create connection based on TLS configuration
+	var ldapURL string
+	if useTLS {
+		ldapURL = fmt.Sprintf("ldaps://%s", address)
+	} else {
+		ldapURL = fmt.Sprintf("ldap://%s", address)
+	}
+
+	// Configure TLS settings if using TLS
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: ldapServer.Spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided
@@ -165,9 +174,9 @@ func (r *LDAPServerReconciler) testConnection(ctx context.Context, ldapServer *o
 			tlsConfig.InsecureSkipVerify = false
 		}
 
-		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 	} else {
-		conn, err = ldap.Dial("tcp", address)
+		conn, err = ldap.DialURL(ldapURL)
 	}
 
 	if err != nil {

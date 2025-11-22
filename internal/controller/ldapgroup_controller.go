@@ -151,9 +151,18 @@ func (r *LDAPGroupReconciler) connectToLDAP(ctx context.Context, ldapServer *ope
 	}
 
 	// Create connection based on TLS configuration
+	var ldapURL string
+	if useTLS {
+		ldapURL = fmt.Sprintf("ldaps://%s", address)
+	} else {
+		ldapURL = fmt.Sprintf("ldap://%s", address)
+	}
+
+	// Configure TLS settings if using TLS
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: ldapServer.Spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided
@@ -164,9 +173,9 @@ func (r *LDAPGroupReconciler) connectToLDAP(ctx context.Context, ldapServer *ope
 			tlsConfig.InsecureSkipVerify = false
 		}
 
-		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 	} else {
-		conn, err = ldap.Dial("tcp", address)
+		conn, err = ldap.DialURL(ldapURL)
 	}
 
 	if err != nil {
@@ -176,14 +185,14 @@ func (r *LDAPGroupReconciler) connectToLDAP(ctx context.Context, ldapServer *ope
 	// Get bind password
 	bindPassword, err := r.getSecretValue(ctx, ldapServer.Namespace, ldapServer.Spec.BindPasswordSecret)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Best effort close, ignore errors
 		return nil, err
 	}
 
 	// Bind to LDAP
 	err = conn.Bind(ldapServer.Spec.BindDN, bindPassword)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Best effort close, ignore errors
 		return nil, err
 	}
 
@@ -367,7 +376,12 @@ func (r *LDAPGroupReconciler) updateGroupStatus(ctx context.Context, conn *ldap.
 	// Update status
 	ldapGroup.Status.DN = groupDN
 	ldapGroup.Status.Members = currentMembers
-	ldapGroup.Status.MemberCount = int32(len(currentMembers))
+	// Safe conversion: member count is naturally bounded by practical LDAP limits
+	memberCount := len(currentMembers)
+	if memberCount > 2147483647 {
+		return fmt.Errorf("member count exceeds int32 maximum")
+	}
+	ldapGroup.Status.MemberCount = int32(memberCount) // #nosec G115 - validated above
 
 	logger.Info("Updated group status", "memberCount", ldapGroup.Status.MemberCount)
 	return nil

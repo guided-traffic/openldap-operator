@@ -38,6 +38,12 @@ import (
 	ldapClient "github.com/guided-traffic/openldap-operator/internal/ldap"
 )
 
+const (
+	// Default organizational unit names
+	defaultUsersOU  = "users"
+	defaultGroupsOU = "groups"
+)
+
 // LDAPUserReconciler reconciles a LDAPUser object
 type LDAPUserReconciler struct {
 	client.Client
@@ -158,9 +164,18 @@ func (r *LDAPUserReconciler) connectToLDAP(ctx context.Context, ldapServer *open
 	}
 
 	// Create connection based on TLS configuration
+	var ldapURL string
+	if useTLS {
+		ldapURL = fmt.Sprintf("ldaps://%s", address)
+	} else {
+		ldapURL = fmt.Sprintf("ldap://%s", address)
+	}
+
+	// Configure TLS settings if using TLS
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: ldapServer.Spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided
@@ -171,9 +186,9 @@ func (r *LDAPUserReconciler) connectToLDAP(ctx context.Context, ldapServer *open
 			tlsConfig.InsecureSkipVerify = false
 		}
 
-		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 	} else {
-		conn, err = ldap.Dial("tcp", address)
+		conn, err = ldap.DialURL(ldapURL)
 	}
 
 	if err != nil {
@@ -183,14 +198,14 @@ func (r *LDAPUserReconciler) connectToLDAP(ctx context.Context, ldapServer *open
 	// Get bind password
 	bindPassword, err := r.getSecretValue(ctx, ldapServer.Namespace, ldapServer.Spec.BindPasswordSecret)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Best effort close, ignore errors
 		return nil, err
 	}
 
 	// Bind to LDAP
 	err = conn.Bind(ldapServer.Spec.BindDN, bindPassword)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Best effort close, ignore errors
 		return nil, err
 	}
 
@@ -202,7 +217,7 @@ func (r *LDAPUserReconciler) reconcileUser(ctx context.Context, conn *ldap.Conn,
 	// Construct the user DN
 	ou := ldapUser.Spec.OrganizationalUnit
 	if ou == "" {
-		ou = "users"
+		ou = defaultUsersOU
 	}
 	userDN := fmt.Sprintf("uid=%s,ou=%s,%s", ldapUser.Spec.Username, ou, ldapServer.Spec.BaseDN)
 
@@ -323,8 +338,6 @@ func (r *LDAPUserReconciler) updateLDAPUser(conn *ldap.Conn, userDN string, ldap
 
 // reconcileUserGroups manages the group membership for the user
 func (r *LDAPUserReconciler) reconcileUserGroups(ctx context.Context, conn *ldap.Conn, ldapServer *openldapv1.LDAPServer, ldapUser *openldapv1.LDAPUser) error {
-	logger := log.FromContext(ctx)
-
 	// Get bind password to create LDAP client
 	bindPassword, err := r.getSecretValue(ctx, ldapServer.Namespace, ldapServer.Spec.BindPasswordSecret)
 	if err != nil {
@@ -340,15 +353,11 @@ func (r *LDAPUserReconciler) reconcileUserGroups(ctx context.Context, conn *ldap
 
 	userOU := ldapUser.Spec.OrganizationalUnit
 	if userOU == "" {
-		userOU = "users"
+		userOU = defaultUsersOU
 	}
 
-	// Get current groups the user belongs to
-	currentGroups, err := client.GetUserGroups(ldapUser.Spec.Username, userOU, "groups")
-	if err != nil {
-		logger.Error(err, "Failed to get current user groups")
-		currentGroups = []string{} // Continue with empty list
-	}
+	// Get current groups
+	currentGroups := r.getCurrentGroups(ctx, client, ldapUser.Spec.Username, userOU)
 
 	// Get desired groups from spec
 	desiredGroups := ldapUser.Spec.Groups
@@ -356,12 +365,38 @@ func (r *LDAPUserReconciler) reconcileUserGroups(ctx context.Context, conn *ldap
 		desiredGroups = []string{}
 	}
 
-	// Check which groups exist and which are missing
-	var existingGroups []string
-	var missingGroups []string
+	// Categorize groups as existing or missing
+	existingGroups, missingGroups := r.categorizeGroups(ctx, client, desiredGroups, ldapUser.Spec.Username)
+
+	// Sync group memberships
+	r.addUserToMissingGroups(ctx, client, ldapUser.Spec.Username, userOU, existingGroups, currentGroups)
+	r.removeUserFromExtraGroups(ctx, client, ldapUser.Spec.Username, userOU, existingGroups, currentGroups)
+
+	// Update status with current and missing groups
+	ldapUser.Status.Groups = existingGroups
+	ldapUser.Status.MissingGroups = missingGroups
+
+	return nil
+}
+
+// getCurrentGroups retrieves current group memberships for a user
+func (r *LDAPUserReconciler) getCurrentGroups(ctx context.Context, client *ldapClient.Client, username, userOU string) []string {
+	logger := log.FromContext(ctx)
+	currentGroups, err := client.GetUserGroups(username, userOU, defaultGroupsOU)
+	if err != nil {
+		logger.Error(err, "Failed to get current user groups")
+		return []string{}
+	}
+	return currentGroups
+}
+
+// categorizeGroups separates desired groups into existing and missing
+func (r *LDAPUserReconciler) categorizeGroups(ctx context.Context, client *ldapClient.Client, desiredGroups []string, username string) ([]string, []string) {
+	logger := log.FromContext(ctx)
+	var existingGroups, missingGroups []string
 
 	for _, groupName := range desiredGroups {
-		exists, err := client.GroupExists(groupName, "groups")
+		exists, err := client.GroupExists(groupName, defaultGroupsOU)
 		if err != nil {
 			logger.Error(err, "Failed to check if group exists", "group", groupName)
 			continue
@@ -371,69 +406,86 @@ func (r *LDAPUserReconciler) reconcileUserGroups(ctx context.Context, conn *ldap
 			existingGroups = append(existingGroups, groupName)
 		} else {
 			missingGroups = append(missingGroups, groupName)
-			logger.Info("Group does not exist in LDAP", "group", groupName, "user", ldapUser.Spec.Username)
+			logger.Info("Group does not exist in LDAP", "group", groupName, "user", username)
 		}
 	}
 
-	// Add user to groups they should be in but aren't
+	return existingGroups, missingGroups
+}
+
+// addUserToMissingGroups adds user to groups they should be in but aren't
+func (r *LDAPUserReconciler) addUserToMissingGroups(ctx context.Context, client *ldapClient.Client, username, userOU string, existingGroups, currentGroups []string) {
+	logger := log.FromContext(ctx)
+
 	for _, groupName := range existingGroups {
-		inGroup := false
-		for _, currentGroup := range currentGroups {
-			if currentGroup == groupName {
-				inGroup = true
-				break
-			}
+		if r.isInGroup(groupName, currentGroups) {
+			continue
 		}
 
-		if !inGroup {
-			// Determine group type by trying to get group info
-			groupType := openldapv1.GroupTypeGroupOfNames // Default
-			logger.Info("Adding user to group", "user", ldapUser.Spec.Username, "group", groupName)
-
-			err := client.AddUserToGroup(ldapUser.Spec.Username, userOU, groupName, "groups", groupType)
-			if err != nil {
-				logger.Error(err, "Failed to add user to group", "user", ldapUser.Spec.Username, "group", groupName)
-				// Try with different group types
-				for _, gType := range []openldapv1.GroupType{openldapv1.GroupTypePosix, openldapv1.GroupTypeGroupOfUniqueNames} {
-					err := client.AddUserToGroup(ldapUser.Spec.Username, userOU, groupName, "groups", gType)
-					if err == nil {
-						logger.Info("Successfully added user to group with type", "user", ldapUser.Spec.Username, "group", groupName, "type", gType)
-						break
-					}
-				}
-			}
-		}
+		logger.Info("Adding user to group", "user", username, "group", groupName)
+		r.tryAddUserToGroup(ctx, client, username, userOU, groupName)
 	}
+}
 
-	// Remove user from groups they shouldn't be in anymore
+// removeUserFromExtraGroups removes user from groups they shouldn't be in
+func (r *LDAPUserReconciler) removeUserFromExtraGroups(ctx context.Context, client *ldapClient.Client, username, userOU string, existingGroups, currentGroups []string) {
+	logger := log.FromContext(ctx)
+
 	for _, currentGroup := range currentGroups {
-		shouldBeInGroup := false
-		for _, desiredGroup := range existingGroups {
-			if currentGroup == desiredGroup {
-				shouldBeInGroup = true
-				break
-			}
+		if r.isInGroup(currentGroup, existingGroups) {
+			continue
 		}
 
-		if !shouldBeInGroup {
-			logger.Info("Removing user from group", "user", ldapUser.Spec.Username, "group", currentGroup)
+		logger.Info("Removing user from group", "user", username, "group", currentGroup)
+		r.tryRemoveUserFromGroup(ctx, client, username, userOU, currentGroup)
+	}
+}
 
-			// Try different group types
-			for _, gType := range []openldapv1.GroupType{openldapv1.GroupTypeGroupOfNames, openldapv1.GroupTypePosix, openldapv1.GroupTypeGroupOfUniqueNames} {
-				err := client.RemoveUserFromGroup(ldapUser.Spec.Username, userOU, currentGroup, "groups", gType)
-				if err == nil {
-					logger.Info("Successfully removed user from group", "user", ldapUser.Spec.Username, "group", currentGroup)
-					break
-				}
-			}
+// isInGroup checks if a group is in the list
+func (r *LDAPUserReconciler) isInGroup(group string, groups []string) bool {
+	for _, g := range groups {
+		if g == group {
+			return true
 		}
 	}
+	return false
+}
 
-	// Update status with current and missing groups
-	ldapUser.Status.Groups = existingGroups
-	ldapUser.Status.MissingGroups = missingGroups
+// tryAddUserToGroup attempts to add user to group with different types
+func (r *LDAPUserReconciler) tryAddUserToGroup(ctx context.Context, client *ldapClient.Client, username, userOU, groupName string) {
+	logger := log.FromContext(ctx)
+	groupTypes := []openldapv1.GroupType{
+		openldapv1.GroupTypeGroupOfNames,
+		openldapv1.GroupTypePosix,
+		openldapv1.GroupTypeGroupOfUniqueNames,
+	}
 
-	return nil
+	for _, gType := range groupTypes {
+		err := client.AddUserToGroup(username, userOU, groupName, defaultGroupsOU, gType)
+		if err == nil {
+			logger.Info("Successfully added user to group", "user", username, "group", groupName, "type", gType)
+			return
+		}
+	}
+	logger.Error(nil, "Failed to add user to group with all types", "user", username, "group", groupName)
+}
+
+// tryRemoveUserFromGroup attempts to remove user from group with different types
+func (r *LDAPUserReconciler) tryRemoveUserFromGroup(ctx context.Context, client *ldapClient.Client, username, userOU, groupName string) {
+	logger := log.FromContext(ctx)
+	groupTypes := []openldapv1.GroupType{
+		openldapv1.GroupTypeGroupOfNames,
+		openldapv1.GroupTypePosix,
+		openldapv1.GroupTypeGroupOfUniqueNames,
+	}
+
+	for _, gType := range groupTypes {
+		err := client.RemoveUserFromGroup(username, userOU, groupName, defaultGroupsOU, gType)
+		if err == nil {
+			logger.Info("Successfully removed user from group", "user", username, "group", groupName)
+			return
+		}
+	}
 }
 
 // updateStatus updates the status of the LDAPUser resource

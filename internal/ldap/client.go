@@ -26,6 +26,13 @@ import (
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
+const (
+	// LDAP group membership attribute names
+	attrMember       = "member"
+	attrUniqueMember = "uniqueMember"
+	attrMemberUid    = "memberUid"
+)
+
 // Client represents an LDAP client wrapper
 type Client struct {
 	conn   *ldap.Conn
@@ -46,9 +53,18 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 	}
 
 	// Create connection based on TLS configuration
+	var ldapURL string
+	if useTLS {
+		ldapURL = fmt.Sprintf("ldaps://%s", address)
+	} else {
+		ldapURL = fmt.Sprintf("ldap://%s", address)
+	}
+
+	// Configure TLS settings if using TLS
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided
@@ -59,9 +75,9 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 			tlsConfig.InsecureSkipVerify = false
 		}
 
-		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 	} else {
-		conn, err = ldap.Dial("tcp", address)
+		conn, err = ldap.DialURL(ldapURL)
 	}
 
 	if err != nil {
@@ -78,7 +94,7 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 	// Bind with provided credentials
 	err = conn.Bind(spec.BindDN, password)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Ignore close error when bind fails
 		return nil, fmt.Errorf("failed to bind to LDAP server: %w", err)
 	}
 
@@ -91,7 +107,7 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 // Close closes the LDAP connection
 func (c *Client) Close() error {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close() // Best effort close, ignore errors
 	}
 	return nil
 }
@@ -129,7 +145,7 @@ func (c *Client) ensureConnection() error {
 	err := c.TestConnection()
 	if err != nil {
 		// Connection is broken, try to reconnect
-		c.conn.Close()
+		_ = c.conn.Close() // Best effort close, ignore errors
 
 		// Recreate connection
 		var conn *ldap.Conn
@@ -142,9 +158,18 @@ func (c *Client) ensureConnection() error {
 		}
 
 		// Create connection based on TLS configuration
+		var ldapURL string
+		if useTLS {
+			ldapURL = fmt.Sprintf("ldaps://%s", address)
+		} else {
+			ldapURL = fmt.Sprintf("ldap://%s", address)
+		}
+
+		// Configure TLS settings if using TLS
 		if useTLS {
 			tlsConfig := &tls.Config{
 				ServerName: c.config.Host,
+				MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 			}
 
 			// Configure TLS settings if TLS config is provided
@@ -155,16 +180,14 @@ func (c *Client) ensureConnection() error {
 				tlsConfig.InsecureSkipVerify = false
 			}
 
-			conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+			conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 		} else {
-			conn, err = ldap.Dial("tcp", address)
+			conn, err = ldap.DialURL(ldapURL)
 		}
 
 		if err != nil {
 			return fmt.Errorf("failed to reconnect to LDAP server: %w", err)
-		}
-
-		// Set timeout
+		} // Set timeout
 		timeout := time.Duration(30) * time.Second
 		if c.config.ConnectionTimeout > 0 {
 			timeout = time.Duration(c.config.ConnectionTimeout) * time.Second
@@ -374,7 +397,7 @@ func (c *Client) CreateGroup(groupSpec *openldapv1.LDAPGroupSpec) error {
 	// Add initial member for groupOfNames (required)
 	if groupSpec.GroupType == openldapv1.GroupTypeGroupOfNames {
 		attrs = append(attrs, ldap.Attribute{
-			Type: "member",
+			Type: attrMember,
 			Vals: []string{c.config.BindDN}, // Use bind DN as initial member
 		})
 	}
@@ -437,11 +460,11 @@ func (c *Client) AddUserToGroup(username, userOU, groupName, groupOU string, gro
 
 	switch groupType {
 	case openldapv1.GroupTypeGroupOfNames:
-		modifyRequest.Add("member", []string{userDN})
+		modifyRequest.Add(attrMember, []string{userDN})
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		modifyRequest.Add("uniqueMember", []string{userDN})
+		modifyRequest.Add(attrUniqueMember, []string{userDN})
 	case openldapv1.GroupTypePosix:
-		modifyRequest.Add("memberUid", []string{username})
+		modifyRequest.Add(attrMemberUid, []string{username})
 	}
 
 	return c.conn.Modify(modifyRequest)
@@ -456,11 +479,11 @@ func (c *Client) RemoveUserFromGroup(username, userOU, groupName, groupOU string
 
 	switch groupType {
 	case openldapv1.GroupTypeGroupOfNames:
-		modifyRequest.Delete("member", []string{userDN})
+		modifyRequest.Delete(attrMember, []string{userDN})
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		modifyRequest.Delete("uniqueMember", []string{userDN})
+		modifyRequest.Delete(attrUniqueMember, []string{userDN})
 	case openldapv1.GroupTypePosix:
-		modifyRequest.Delete("memberUid", []string{username})
+		modifyRequest.Delete(attrMemberUid, []string{username})
 	}
 
 	return c.conn.Modify(modifyRequest)
@@ -473,13 +496,13 @@ func (c *Client) GetGroupMembers(groupName, ou string, groupType openldapv1.Grou
 	var attribute string
 	switch groupType {
 	case openldapv1.GroupTypeGroupOfNames:
-		attribute = "member"
+		attribute = attrMember
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		attribute = "uniqueMember"
+		attribute = attrUniqueMember
 	case openldapv1.GroupTypePosix:
-		attribute = "memberUid"
+		attribute = attrMemberUid
 	default:
-		attribute = "member"
+		attribute = attrMember
 	}
 
 	searchRequest := ldap.NewSearchRequest(
