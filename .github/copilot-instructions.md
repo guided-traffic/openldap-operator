@@ -117,3 +117,4 @@ Currently supports posixGroup, groupOfNames, groupOfUniqueNames. See `internal/l
 - **No Webhooks Currently**: Validation is type-level + programmatic, no admission webhooks deployed
 - **Version control**: Never commit to git yourself
 - **Test-files**: There should be only one test-file pro code-file.
+- **Language**: Write code, comments, variable names, function names, and everything else in English.

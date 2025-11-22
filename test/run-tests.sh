@@ -24,7 +24,7 @@ SKIP_INTEGRATION=false
 VERBOSE=false
 COVERAGE=false
 LDAP_HOST="localhost"
-LDAP_PORT="389"
+LDAP_PORT="1389"  # External port mapped from Docker container
 DOCKER_COMPOSE_CMD="docker-compose"  # Default, will be detected in check_prerequisites
 
 # Function to print colored output
@@ -176,7 +176,8 @@ setup_docker() {
     local attempt=1
 
     while [[ $attempt -le $max_attempts ]]; do
-        if $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapsearch -x -H ldap://localhost:1389 -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w "admin123" >/dev/null 2>&1; then
+        # Check from inside the container using internal port 389
+        if $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapsearch -x -H ldap://localhost:389 -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w "admin123" >/dev/null 2>&1; then
             print_status "LDAP server is ready"
             break
         fi
@@ -195,7 +196,7 @@ setup_docker() {
     # Initialize test data
     print_status "Initializing test data..."
     if [[ -f "${TEST_DIR}/ldap-config/init.ldif" ]]; then
-        $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapadd -x -H ldap://localhost:1389 -D "cn=admin,dc=example,dc=com" -w "admin123" -f /ldifs/init.ldif 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w "admin123" -f /ldifs/init.ldif 2>/dev/null || true
     fi
 }
 
@@ -280,18 +281,9 @@ run_integration_tests() {
         print_status "  Base DN: $LDAP_BASE_DN"
     fi
 
-    # Run the integration test binary
-    if [[ -f "${TEST_DIR}/integration/runner/main.go" ]]; then
-        cd "${TEST_DIR}/integration/runner"
-        go run main.go \
-            --ldap-host "$LDAP_HOST" \
-            --ldap-port "$LDAP_PORT" \
-            --ldap-bind-dn "$LDAP_BIND_DN" \
-            --ldap-base-dn "$LDAP_BASE_DN" \
-            --ldap-password "$LDAP_PASSWORD"
-    else
-        print_warning "Integration test binary not found, skipping"
-    fi
+    # Run integration tests from internal/ldap that use Docker
+    print_status "Running LDAP client integration tests..."
+    go test -v ./internal/ldap/... -cover
 
     print_status "Integration tests completed"
 }
