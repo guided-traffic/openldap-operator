@@ -175,6 +175,7 @@ func (r *LDAPUserReconciler) connectToLDAP(ctx context.Context, ldapServer *open
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: ldapServer.Spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided
@@ -197,14 +198,14 @@ func (r *LDAPUserReconciler) connectToLDAP(ctx context.Context, ldapServer *open
 	// Get bind password
 	bindPassword, err := r.getSecretValue(ctx, ldapServer.Namespace, ldapServer.Spec.BindPasswordSecret)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Best effort close, ignore errors
 		return nil, err
 	}
 
 	// Bind to LDAP
 	err = conn.Bind(ldapServer.Spec.BindDN, bindPassword)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Best effort close, ignore errors
 		return nil, err
 	}
 

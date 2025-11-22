@@ -98,9 +98,13 @@ type TestSuite struct {
 
 // NewTestSuite creates a new test suite
 func NewTestSuite(config *TestConfig) (*TestSuite, error) {
+	// Validate port range to prevent overflow
+	if config.LDAPPort < 0 || config.LDAPPort > 65535 {
+		return nil, fmt.Errorf("invalid port number: %d", config.LDAPPort)
+	}
 	spec := &openldapv1.LDAPServerSpec{
 		Host:              config.LDAPHost,
-		Port:              int32(config.LDAPPort), //nolint:gosec // Port is validated to be in valid range
+		Port:              int32(config.LDAPPort),
 		BindDN:            config.LDAPBindDN,
 		BaseDN:            config.LDAPBaseDN,
 		ConnectionTimeout: int32(config.Timeout.Seconds()),

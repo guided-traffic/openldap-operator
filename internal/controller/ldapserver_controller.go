@@ -163,6 +163,7 @@ func (r *LDAPServerReconciler) testConnection(ctx context.Context, ldapServer *o
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: ldapServer.Spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided

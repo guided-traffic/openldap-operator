@@ -64,6 +64,7 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: spec.Host,
+			MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 		}
 
 		// Configure TLS settings if TLS config is provided
@@ -93,7 +94,7 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 	// Bind with provided credentials
 	err = conn.Bind(spec.BindDN, password)
 	if err != nil {
-		conn.Close()
+		_ = conn.Close() // Ignore close error when bind fails
 		return nil, fmt.Errorf("failed to bind to LDAP server: %w", err)
 	}
 
@@ -106,7 +107,7 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 // Close closes the LDAP connection
 func (c *Client) Close() error {
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close() // Best effort close, ignore errors
 	}
 	return nil
 }
@@ -144,7 +145,7 @@ func (c *Client) ensureConnection() error {
 	err := c.TestConnection()
 	if err != nil {
 		// Connection is broken, try to reconnect
-		c.conn.Close()
+		_ = c.conn.Close() // Best effort close, ignore errors
 
 		// Recreate connection
 		var conn *ldap.Conn
@@ -168,6 +169,7 @@ func (c *Client) ensureConnection() error {
 		if useTLS {
 			tlsConfig := &tls.Config{
 				ServerName: c.config.Host,
+				MinVersion: tls.VersionTLS12, // Enforce minimum TLS 1.2
 			}
 
 			// Configure TLS settings if TLS config is provided
