@@ -172,10 +172,10 @@ jobs:
       - name: Create Kind cluster
         uses: helm/kind-action@v1.12.0
         with:
-          version: v0.25.0
-          node_image: kindest/node:v1.32.0
+          version: v0.24.0
+          node_image: kindest/node:v1.31.0
           cluster_name: openldap-operator-test
-          wait: 60s
+          wait: 120s
 
       - name: Verify Kind cluster
         run: |
