@@ -127,11 +127,247 @@ jobs:
       - name: Run linting
         run: make lint
 
+  integration-tests:
+    name: Integration Tests
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Run integration tests with Docker
+        run: make test-integration
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.12.0
+        with:
+          version: v0.25.0
+          node_image: kindest/node:v1.32.0
+          cluster_name: openldap-operator-test
+          wait: 60s
+
+      - name: Verify Kind cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Install LDAP server in Kind
+        run: |
+          kubectl create namespace ldap-test
+          kubectl -n ldap-test create secret generic ldap-admin-pass --from-literal=adminpassword=admin
+
+          kubectl -n ldap-test apply -f - <<EOF
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: openldap
+          spec:
+            type: ClusterIP
+            ports:
+            - name: ldap
+              port: 389
+              targetPort: 389
+            selector:
+              app: openldap
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: openldap
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: openldap
+            template:
+              metadata:
+                labels:
+                  app: openldap
+              spec:
+                containers:
+                - name: openldap
+                  image: osixia/openldap:1.5.0
+                  ports:
+                  - containerPort: 389
+                  env:
+                  - name: LDAP_ORGANISATION
+                    value: "Example Inc"
+                  - name: LDAP_DOMAIN
+                    value: "example.com"
+                  - name: LDAP_ADMIN_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: ldap-admin-pass
+                        key: adminpassword
+                  - name: LDAP_TLS
+                    value: "false"
+                  readinessProbe:
+                    tcpSocket:
+                      port: 389
+                    initialDelaySeconds: 10
+                    periodSeconds: 5
+          EOF
+
+      - name: Wait for LDAP server
+        run: kubectl -n ldap-test wait --for=condition=available --timeout=120s deployment/openldap
+
+      - name: Build and load operator image
+        run: |
+          make docker-build IMG=openldap-operator:test
+          kind load docker-image openldap-operator:test --name openldap-operator-test
+
+      - name: Install operator in Kind
+        run: |
+          kubectl apply -f deploy/helm/openldap-operator/crds/
+          kubectl create namespace openldap-operator-system
+
+          kubectl -n openldap-operator-system apply -f - <<EOF
+          apiVersion: v1
+          kind: ServiceAccount
+          metadata:
+            name: openldap-operator-controller-manager
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: openldap-operator-controller-manager
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                control-plane: controller-manager
+            template:
+              metadata:
+                labels:
+                  control-plane: controller-manager
+              spec:
+                serviceAccountName: openldap-operator-controller-manager
+                containers:
+                - name: manager
+                  image: openldap-operator:test
+                  imagePullPolicy: Never
+                  command:
+                  - /manager
+                  env:
+                  - name: ENABLE_WEBHOOKS
+                    value: "false"
+                  resources:
+                    limits:
+                      cpu: 500m
+                      memory: 128Mi
+                    requests:
+                      cpu: 10m
+                      memory: 64Mi
+                  livenessProbe:
+                    httpGet:
+                      path: /healthz
+                      port: 8081
+                    initialDelaySeconds: 15
+                    periodSeconds: 20
+                  readinessProbe:
+                    httpGet:
+                      path: /readyz
+                      port: 8081
+                    initialDelaySeconds: 5
+                    periodSeconds: 10
+          EOF
+
+      - name: Wait for operator
+        run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator-controller-manager
+
+      - name: Create test resources
+        run: |
+          kubectl -n ldap-test apply -f - <<EOF
+          apiVersion: openldap.guided-traffic.com/v1
+          kind: LDAPServer
+          metadata:
+            name: test-ldap-server
+          spec:
+            url: ldap://openldap.ldap-test.svc.cluster.local:389
+            baseDN: dc=example,dc=com
+            bindDN: cn=admin,dc=example,dc=com
+            bindPassword:
+              name: ldap-admin-pass
+              key: adminpassword
+            tls:
+              enabled: false
+            healthCheckInterval: 30s
+          ---
+          apiVersion: openldap.guided-traffic.com/v1
+          kind: LDAPGroup
+          metadata:
+            name: test-group
+          spec:
+            ldapServerRef:
+              name: test-ldap-server
+            cn: testgroup
+            ou: groups
+            groupType: posixGroup
+            gidNumber: 5000
+            description: "Test group"
+          ---
+          apiVersion: openldap.guided-traffic.com/v1
+          kind: LDAPUser
+          metadata:
+            name: test-user
+          spec:
+            ldapServerRef:
+              name: test-ldap-server
+            uid: testuser
+            ou: users
+            givenName: Test
+            sn: User
+            cn: Test User
+            mail: testuser@example.com
+            uidNumber: 10001
+            gidNumber: 5000
+            groups:
+            - testgroup
+          EOF
+
+      - name: Wait for resources to sync
+        run: |
+          timeout 60s bash -c 'until kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" | grep -q "Connected"; do sleep 2; done'
+          timeout 60s bash -c 'until kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" | grep -q "Synced"; do sleep 2; done'
+          timeout 60s bash -c 'until kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" | grep -q "Synced"; do sleep 2; done'
+
+      - name: Verify user in LDAP
+        run: |
+          kubectl -n ldap-test exec deployment/openldap -- \
+            ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin \
+            -b "cn=testgroup,ou=groups,dc=example,dc=com" memberUid | grep testuser
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== Operator Logs ==="
+          kubectl -n openldap-operator-system logs deployment/openldap-operator-controller-manager || true
+          echo "=== LDAP Server Logs ==="
+          kubectl -n ldap-test logs deployment/openldap || true
+          echo "=== Resource Status ==="
+          kubectl -n ldap-test get ldapserver,ldapgroup,ldapuser -o yaml || true
+
+      - name: Cleanup Kind cluster
+        if: always()
+        run: kind delete cluster --name openldap-operator-test || true
+
   semantic-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Release
     runs-on: self-hosted
-    needs: [unit-tests, gosec, govulncheck, linter]
+    needs: [unit-tests, gosec, govulncheck, linter, integration-tests]
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
