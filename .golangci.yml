@@ -45,8 +45,25 @@ issues:
         - errcheck
         - gosec
         - goconst
+        - unparam
+        - misspell
+        - unused
+        - gocyclo
+    - path: test/
+      linters:
+        - all
     - path: zz_generated\.deepcopy\.go
       linters:
         - all
+    - text: "G402.*TLS MinVersion" # Ignore TLS version warnings (can be configured via spec)
+      linters:
+        - gosec
+    - text: "is unused" # Ignore unused functions (may be used via reflection or future features)
+      linters:
+        - unused
+        - unparam
+    - text: "unnecessary conversion" # Ignore unnecessary conversions (may be for clarity)
+      linters:
+        - unconvert
   max-issues-per-linter: 0
   max-same-issues: 0

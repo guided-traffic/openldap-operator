@@ -46,6 +46,14 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 	}
 
 	// Create connection based on TLS configuration
+	var ldapURL string
+	if useTLS {
+		ldapURL = fmt.Sprintf("ldaps://%s", address)
+	} else {
+		ldapURL = fmt.Sprintf("ldap://%s", address)
+	}
+
+	// Configure TLS settings if using TLS
 	if useTLS {
 		tlsConfig := &tls.Config{
 			ServerName: spec.Host,
@@ -59,9 +67,9 @@ func NewClient(spec *openldapv1.LDAPServerSpec, password string) (*Client, error
 			tlsConfig.InsecureSkipVerify = false
 		}
 
-		conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+		conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 	} else {
-		conn, err = ldap.Dial("tcp", address)
+		conn, err = ldap.DialURL(ldapURL)
 	}
 
 	if err != nil {
@@ -142,6 +150,14 @@ func (c *Client) ensureConnection() error {
 		}
 
 		// Create connection based on TLS configuration
+		var ldapURL string
+		if useTLS {
+			ldapURL = fmt.Sprintf("ldaps://%s", address)
+		} else {
+			ldapURL = fmt.Sprintf("ldap://%s", address)
+		}
+
+		// Configure TLS settings if using TLS
 		if useTLS {
 			tlsConfig := &tls.Config{
 				ServerName: c.config.Host,
@@ -155,16 +171,14 @@ func (c *Client) ensureConnection() error {
 				tlsConfig.InsecureSkipVerify = false
 			}
 
-			conn, err = ldap.DialTLS("tcp", address, tlsConfig)
+			conn, err = ldap.DialURL(ldapURL, ldap.DialWithTLSConfig(tlsConfig))
 		} else {
-			conn, err = ldap.Dial("tcp", address)
+			conn, err = ldap.DialURL(ldapURL)
 		}
 
 		if err != nil {
 			return fmt.Errorf("failed to reconnect to LDAP server: %w", err)
-		}
-
-		// Set timeout
+		} // Set timeout
 		timeout := time.Duration(30) * time.Second
 		if c.config.ConnectionTimeout > 0 {
 			timeout = time.Duration(c.config.ConnectionTimeout) * time.Second
