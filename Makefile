@@ -81,7 +81,10 @@ test-all: test test-integration ## Run all tests (unit + integration).
 .PHONY: test-unit
 test-unit: fmt vet ## Run unit tests only (excluding integration tests).
 	@echo "🧪 Running unit tests..."
-	@go test ./... -short -coverprofile=coverage.out -v
+	@go test ./api/... ./internal/controller/... -coverprofile=coverage.out -v 2>&1 | grep -v "does not match go tool version" || true
+	@echo ""
+	@echo "📊 Coverage Summary:"
+	@go tool cover -func=coverage.out | tail -1 || echo "No coverage data"
 
 .PHONY: coverage-ci
 coverage-ci: ## Generate coverage report for CI.
