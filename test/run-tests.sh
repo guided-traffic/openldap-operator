@@ -160,6 +160,7 @@ setup_docker() {
 
     print_status "Setting up Docker environment..."
 
+
     cd "$TEST_DIR"
 
     # Stop any existing containers
