@@ -70,10 +70,12 @@ test-unit: fmt vet
 # Run integration tests only (requires Docker)
 test-integration:
 	@echo "Running integration tests with Docker..."
-	./test/run-tests.sh
+	./test/run-tests.sh --skip-unit
 
-# Run all tests (unit + integration) - integration tests run via run-tests.sh to avoid duplicates
-test-all: test-integration
+# Run all tests (unit + integration)
+test-all:
+	@echo "Running all tests (unit + integration)..."
+	./test/run-tests.sh
 
 # Generate test coverage
 coverage: fmt vet

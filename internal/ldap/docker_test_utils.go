@@ -137,31 +137,55 @@ func (c *LDAPTestContainer) Stop() error {
 func (c *LDAPTestContainer) waitForReady() error {
 	By("Waiting for LDAP container to be ready")
 
-	timeout := time.After(120 * time.Second)  // Increased timeout for LDAP startup
-	ticker := time.NewTicker(3 * time.Second) // Less frequent checks
+	timeout := time.After(180 * time.Second)  // Increased timeout for CI environments
+	ticker := time.NewTicker(2 * time.Second) // Check every 2 seconds
 	defer ticker.Stop()
+
+	// First wait for "First start is done" message
+	startDoneTimeout := time.After(150 * time.Second)
+	startDoneTicker := time.NewTicker(2 * time.Second)
+	defer startDoneTicker.Stop()
+
+	By("Waiting for LDAP initial setup to complete")
+	for {
+		select {
+		case <-startDoneTimeout:
+			cmd := exec.Command("docker", "logs", c.containerName) // #nosec G204 -- containerName is managed internally
+			logs, _ := cmd.Output()
+			return fmt.Errorf("timeout waiting for LDAP initial setup. Container logs:\n%s", string(logs))
+		case <-startDoneTicker.C:
+			cmd := exec.Command("docker", "logs", c.containerName) // #nosec G204 -- containerName is managed internally
+			logOutput, err := cmd.Output()
+			if err == nil && strings.Contains(string(logOutput), "First start is done") {
+				By("LDAP initial setup completed, waiting for service to be ready")
+				goto waitForService
+			}
+		}
+	}
+
+waitForService:
+	// Now wait for LDAP service to actually accept connections
+	time.Sleep(5 * time.Second) // Give it a moment to start the service
 
 	for {
 		select {
 		case <-timeout:
 			// Get container logs for debugging
-			cmd := exec.Command("docker", "logs", c.containerName) // #nosec G204 -- containerName is a constant
+			cmd := exec.Command("docker", "logs", c.containerName) // #nosec G204 -- containerName is managed internally
 			logs, _ := cmd.Output()
-			return fmt.Errorf("timeout waiting for LDAP container to be ready. Container logs:\n%s", string(logs))
+			return fmt.Errorf("timeout waiting for LDAP service to accept connections. Container logs:\n%s", string(logs))
 		case <-ticker.C:
-			if c.isReady() {
-				By("LDAP container is ready")
-				// Wait a bit more to ensure LDAP is fully initialized
-				time.Sleep(5 * time.Second)
+			if c.isServiceReady() {
+				By("LDAP container is ready and accepting connections")
 				return nil
 			}
 		}
 	}
 }
 
-// isReady checks if the LDAP container is ready
-func (c *LDAPTestContainer) isReady() bool {
-	// Check if container is running
+// isServiceReady checks if the LDAP service is accepting connections
+func (c *LDAPTestContainer) isServiceReady() bool {
+	// Check if container is still running
 	// #nosec G204 -- containerName is managed internally
 	cmd := exec.Command("docker", "ps", "--filter", fmt.Sprintf("name=%s", c.containerName), "--format", "{{.Status}}")
 	output, err := cmd.Output()
@@ -171,12 +195,6 @@ func (c *LDAPTestContainer) isReady() bool {
 
 	status := strings.TrimSpace(string(output))
 	if !strings.HasPrefix(status, "Up") {
-		return false
-	}
-
-	// Try to connect using netcat first
-	cmd = exec.Command("nc", "-z", "localhost", c.port)
-	if cmd.Run() != nil {
 		return false
 	}
 

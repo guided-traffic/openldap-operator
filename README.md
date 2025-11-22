@@ -518,22 +518,21 @@ open coverage.html
 The project includes comprehensive unit and integration tests with **90.6% test coverage** and real LDAP integration:
 
 ```bash
-# Run all tests with coverage
-make test-coverage
+# Run all tests (unit + integration)
+make test-all
 
 # Run unit tests only
-make test
-go test ./... -v
+make test-unit
 
-# Run LDAP integration tests (requires Docker)
-go test ./internal/ldap/... -v
+# Run integration tests only (requires Docker)
+make test-integration
 
-# Run tests with coverage report
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out -o coverage.html
+# Run all tests with coverage report
+make test-coverage
 
-# Run specific package tests
-go test ./internal/ldap/... -run TestLDAP
+# Direct Go test commands
+go test ./api/... ./internal/controller/... -v     # Unit tests
+go test ./internal/ldap/... -v                      # Integration tests
 ```
 
 #### Docker-based Integration Tests
