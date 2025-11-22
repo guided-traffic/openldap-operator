@@ -2,6 +2,7 @@ package ldap
 
 import (
 	"fmt"
+	"math/rand"
 	"os/exec"
 	"strings"
 	"time"
@@ -25,13 +26,22 @@ const (
 // LDAPTestContainer manages a Docker container for LDAP testing
 type LDAPTestContainer struct {
 	containerName string
+	port          string
+	tlsPort       string
 	running       bool
 }
 
 // NewLDAPTestContainer creates a new LDAP test container manager
 func NewLDAPTestContainer() *LDAPTestContainer {
+	// Generate unique container name with timestamp and random number
+	timestamp := time.Now().UnixNano()
+	random := rand.New(rand.NewSource(timestamp)).Intn(10000) // #nosec G404 -- not used for cryptographic purposes
+	uniqueName := fmt.Sprintf("%s-%d-%d", ldapContainerName, timestamp, random)
+
 	return &LDAPTestContainer{
-		containerName: ldapContainerName,
+		containerName: uniqueName,
+		port:          ldapPort,
+		tlsPort:       ldapTLSPort,
 		running:       false,
 	}
 }
@@ -40,18 +50,21 @@ func NewLDAPTestContainer() *LDAPTestContainer {
 func (c *LDAPTestContainer) Start() error {
 	By("Starting LDAP Docker container")
 
-	// Stop any existing container first
-	_ = c.Stop()
+	// Clean up any existing containers using the same ports
+	c.cleanupExistingContainers()
 
-	// Remove any existing container
-	_ = exec.Command("docker", "rm", "-f", c.containerName).Run() // #nosec G204 -- containerName is a constant
+	// Remove any existing container with the same name
+	_ = exec.Command("docker", "rm", "-f", c.containerName).Run() // #nosec G204 -- containerName is managed internally
+
+	// Wait a bit to ensure port is released
+	time.Sleep(500 * time.Millisecond)
 
 	// Start new container
-	// #nosec G204 -- Using trusted container image and sanitized constant inputs
+	// #nosec G204 -- Using trusted container image and sanitized inputs
 	cmd := exec.Command("docker", "run", "-d",
 		"--name", c.containerName,
-		"-p", fmt.Sprintf("%s:389", ldapPort),
-		"-p", fmt.Sprintf("%s:636", ldapTLSPort),
+		"-p", fmt.Sprintf("%s:389", c.port),
+		"-p", fmt.Sprintf("%s:636", c.tlsPort),
 		"-e", "LDAP_ORGANIZATION=Example Inc.",
 		"-e", "LDAP_DOMAIN=example.com",
 		"-e", fmt.Sprintf("LDAP_ADMIN_PASSWORD=%s", adminPassword),
@@ -83,6 +96,23 @@ func (c *LDAPTestContainer) Start() error {
 	return c.waitForReady()
 }
 
+// cleanupExistingContainers removes any containers that might be using our ports
+func (c *LDAPTestContainer) cleanupExistingContainers() {
+	// Find containers using port 1389
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("docker ps -q --filter publish=%s", c.port))
+	output, err := cmd.Output()
+	if err == nil && len(output) > 0 {
+		containerIDs := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, id := range containerIDs {
+			if id != "" {
+				_ = exec.Command("docker", "rm", "-f", id).Run() // #nosec G204 -- containerID from docker command
+			}
+		}
+		// Wait for cleanup
+		time.Sleep(1 * time.Second)
+	}
+}
+
 // Stop stops and removes the LDAP Docker container
 func (c *LDAPTestContainer) Stop() error {
 	if !c.running {
@@ -91,15 +121,15 @@ func (c *LDAPTestContainer) Stop() error {
 
 	By("Stopping LDAP Docker container")
 
-	// Stop container
-	cmd := exec.Command("docker", "stop", c.containerName) // #nosec G204 -- containerName is a constant
-	_ = cmd.Run()                                          // Ignore errors
-
-	// Remove container
-	cmd = exec.Command("docker", "rm", "-f", c.containerName) // #nosec G204 -- containerName is a constant
-	_ = cmd.Run()                                             // Ignore errors
+	// Force remove container (this also stops it)
+	cmd := exec.Command("docker", "rm", "-f", c.containerName) // #nosec G204 -- containerName is managed internally
+	_ = cmd.Run()                                              // Ignore errors
 
 	c.running = false
+
+	// Wait to ensure port is released
+	time.Sleep(500 * time.Millisecond)
+
 	return nil
 }
 
@@ -132,7 +162,7 @@ func (c *LDAPTestContainer) waitForReady() error {
 // isReady checks if the LDAP container is ready
 func (c *LDAPTestContainer) isReady() bool {
 	// Check if container is running
-	// #nosec G204 -- containerName is a constant
+	// #nosec G204 -- containerName is managed internally
 	cmd := exec.Command("docker", "ps", "--filter", fmt.Sprintf("name=%s", c.containerName), "--format", "{{.Status}}")
 	output, err := cmd.Output()
 	if err != nil {
@@ -145,7 +175,7 @@ func (c *LDAPTestContainer) isReady() bool {
 	}
 
 	// Try to connect using netcat first
-	cmd = exec.Command("nc", "-z", "localhost", ldapPort)
+	cmd = exec.Command("nc", "-z", "localhost", c.port)
 	if cmd.Run() != nil {
 		return false
 	}
@@ -164,9 +194,13 @@ func (c *LDAPTestContainer) isReady() bool {
 
 // GetConnectionSpec returns the connection spec for the test container
 func (c *LDAPTestContainer) GetConnectionSpec() *v1.LDAPServerSpec {
+	// Parse port as int32
+	var port int32
+	fmt.Sscanf(c.port, "%d", &port)
+
 	return &v1.LDAPServerSpec{
 		Host:   "localhost",
-		Port:   1389,
+		Port:   port,
 		BindDN: "cn=admin,dc=example,dc=com",
 		BaseDN: baseDN,
 		TLS: &v1.TLSConfig{
@@ -177,9 +211,13 @@ func (c *LDAPTestContainer) GetConnectionSpec() *v1.LDAPServerSpec {
 
 // GetTLSConnectionSpec returns the TLS connection spec for the test container
 func (c *LDAPTestContainer) GetTLSConnectionSpec() *v1.LDAPServerSpec {
+	// Parse port as int32
+	var tlsPort int32
+	fmt.Sscanf(c.tlsPort, "%d", &tlsPort)
+
 	return &v1.LDAPServerSpec{
 		Host:   "localhost",
-		Port:   1636,
+		Port:   tlsPort,
 		BindDN: "cn=admin,dc=example,dc=com",
 		BaseDN: baseDN,
 		TLS: &v1.TLSConfig{
@@ -187,9 +225,7 @@ func (c *LDAPTestContainer) GetTLSConnectionSpec() *v1.LDAPServerSpec {
 			InsecureSkipVerify: true, // For testing
 		},
 	}
-}
-
-// GetAdminPassword returns the admin password for the test container
+} // GetAdminPassword returns the admin password for the test container
 func (c *LDAPTestContainer) GetAdminPassword() string {
 	return adminPassword
 }
