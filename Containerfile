@@ -1,34 +1,60 @@
-# Build the manager binary
-FROM golang:1.25 as builder
+# buildtime stage
+FROM golang:1.25.4-alpine AS builder
+
+# Build arguments for metadata
+ARG BUILD_NUMBER
+ARG GIT_COMMIT
+ARG BUILD_TIME
+
+# Set build arguments for cross-compilation
 ARG TARGETOS
 ARG TARGETARCH
 
-WORKDIR /workspace
-# Copy the Go Modules manifests
-COPY go.mod go.mod
-COPY go.sum go.sum
-# cache deps before building and copying source so that we don't need to re-download as much
-# and so that source changes don't invalidate our downloaded layer
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git ca-certificates
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
-# Copy the go source
-COPY cmd/main.go cmd/main.go
-COPY api/ api/
-COPY internal/controller/ internal/controller/
-COPY internal/ldap/ internal/ldap/
+# Copy source code
+COPY . .
 
-# Build
-# the GOARCH has not a default value to allow the binary be built according to the host where the command
-# was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
-# the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
-# by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
+# Build the application with cross-compilation support
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} \
+    go build -a -installsuffix cgo \
+    -ldflags="-w -s -X main.version=${BUILD_NUMBER:-dev} -X main.commit=${GIT_COMMIT:-unknown} -X main.buildTime=${BUILD_TIME:-unknown}" \
+    -o manager ./cmd/main.go
 
-# Use distroless as minimal base image to package the manager binary
-# Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM gcr.io/distroless/static:nonroot
+# Final stage - using distroless for minimal attack surface
+FROM gcr.io/distroless/static-debian12:nonroot
+
+# Build arguments for metadata
+ARG BUILD_NUMBER
+ARG GIT_COMMIT
+ARG BUILD_TIME
+
+# Add OCI labels for better metadata
+LABEL org.opencontainers.image.title="OpenLDAP Operator" \
+      org.opencontainers.image.description="A Kubernetes operator that manages external LDAP servers" \
+      org.opencontainers.image.vendor="Guided Traffic" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.documentation="https://github.com/guided-traffic/openldap-operator" \
+      org.opencontainers.image.source="https://github.com/guided-traffic/openldap-operator" \
+      org.opencontainers.image.version="${BUILD_NUMBER:-dev}" \
+      org.opencontainers.image.revision="${GIT_COMMIT:-unknown}" \
+      org.opencontainers.image.created="${BUILD_TIME:-unknown}"
+
+# distroless images run as non-root user 65532 (nonroot) by default
+# distroless includes ca-certificates and tzdata
+
 WORKDIR /
-COPY --from=builder /workspace/manager .
+COPY --from=builder /app/manager .
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
