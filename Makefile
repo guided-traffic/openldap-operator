@@ -81,7 +81,7 @@ test-all: test test-integration ## Run all tests (unit + integration).
 .PHONY: test-unit
 test-unit: fmt vet ## Run unit tests only (excluding integration tests).
 	@echo "🧪 Running unit tests..."
-	@go test ./api/... ./internal/controller/... -coverprofile=coverage.out -v 2>&1 | grep -v "does not match go tool version" || true
+	@go test ./api/... ./internal/controller/... -coverprofile=coverage.out -v 2>&1 | grep -v "does not match go tool version"
 	@echo ""
 	@echo "📊 Coverage Summary:"
 	@go tool cover -func=coverage.out | tail -1 || echo "No coverage data"
@@ -101,7 +101,7 @@ lint: ## Run golangci-lint.
 		echo "golangci-lint not found, installing..."; \
 		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
 	fi
-	@golangci-lint run ./... --out-format=colored-line-number || (echo "⚠️  Linting completed with issues. Please review above." && exit 0)
+	@golangci-lint run ./... --out-format=colored-line-number
 
 .PHONY: gosec
 gosec: ## Run GoSec security scanner.
@@ -110,9 +110,9 @@ gosec: ## Run GoSec security scanner.
 		echo "gosec not found, installing..."; \
 		go install github.com/securego/gosec/v2/cmd/gosec@latest; \
 	fi
-	@gosec -fmt=json -out=gosec-report.json -no-fail ./...
+	@gosec -fmt=json -out=gosec-report.json ./...
 	@echo "📄 GoSec report saved to gosec-report.json"
-	@gosec -fmt=text ./... || true
+	@gosec -fmt=text ./...
 
 .PHONY: vuln
 vuln: ## Run govulncheck for vulnerability scanning.
