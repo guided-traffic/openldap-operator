@@ -78,6 +78,47 @@ test-integration: ## Run integration tests with Docker LDAP server.
 .PHONY: test-all
 test-all: test test-integration ## Run all tests (unit + integration).
 
+.PHONY: test-unit
+test-unit: fmt vet ## Run unit tests only (excluding integration tests).
+	@echo "🧪 Running unit tests..."
+	@go test ./... -short -coverprofile=coverage.out -v
+
+.PHONY: coverage-ci
+coverage-ci: ## Generate coverage report for CI.
+	@echo "📊 Generating coverage report..."
+	@mkdir -p coverage
+	@go tool cover -func=coverage.out > coverage/coverage.txt
+	@go tool cover -html=coverage.out -o coverage/coverage.html
+	@echo "Coverage report generated in coverage/"
+
+.PHONY: lint
+lint: ## Run golangci-lint.
+	@echo "🔍 Running linter..."
+	@if ! command -v golangci-lint &> /dev/null; then \
+		echo "golangci-lint not found, installing..."; \
+		go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+	fi
+	@golangci-lint run ./...
+
+.PHONY: gosec
+gosec: ## Run GoSec security scanner.
+	@echo "🔒 Running GoSec security scan..."
+	@if ! command -v gosec &> /dev/null; then \
+		echo "gosec not found, installing..."; \
+		go install github.com/securego/gosec/v2/cmd/gosec@latest; \
+	fi
+	@gosec -fmt=json -out=gosec-report.json ./...
+	@gosec ./...
+
+.PHONY: vuln
+vuln: ## Run govulncheck for vulnerability scanning.
+	@echo "🛡️  Running vulnerability check..."
+	@if ! command -v govulncheck &> /dev/null; then \
+		echo "govulncheck not found, installing..."; \
+		go install golang.org/x/vuln/cmd/govulncheck@latest; \
+	fi
+	@govulncheck ./...
+
 ##@ Build
 
 .PHONY: build

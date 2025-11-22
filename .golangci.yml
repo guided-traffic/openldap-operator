@@ -1,0 +1,52 @@
+run:
+  timeout: 5m
+  tests: true
+  skip-dirs:
+    - bin
+    - vendor
+
+linters:
+  enable:
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gofmt
+    - goimports
+    - misspell
+    - unparam
+    - unconvert
+    - goconst
+    - gocyclo
+    - gosec
+  disable:
+    - typecheck # Sometimes conflicts with generated code
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  misspell:
+    locale: US
+  gosec:
+    excludes:
+      - G404 # Use of weak random number generator (math/rand instead of crypto/rand)
+    severity: medium
+    confidence: medium
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+        - gosec
+        - goconst
+    - path: zz_generated\.deepcopy\.go
+      linters:
+        - all
+  max-issues-per-linter: 0
+  max-same-issues: 0
