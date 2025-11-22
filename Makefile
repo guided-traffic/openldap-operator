@@ -130,9 +130,14 @@ lint:
 gosec:
 	@echo "Running gosec security scan..."
 	@which gosec > /dev/null || (echo "Installing gosec..." && go install github.com/securego/gosec/v2/cmd/gosec@latest)
-	gosec -fmt=json -out=gosec-report.json ./...
+	@echo "Scanning code for security issues..."
+	@gosec -fmt=json -out=gosec-report.json ./... || true
+	@echo ""
 	@echo "GoSec report saved to gosec-report.json"
-	gosec -fmt=text ./...
+	@echo ""
+	@echo "Security scan results:"
+	@echo "======================"
+	@gosec -fmt=text ./...
 
 # Vulnerability check
 vuln:
