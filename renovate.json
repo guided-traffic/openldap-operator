@@ -48,6 +48,10 @@
       "automergeType": "pr",
       "matchPackageNames": [
         "/^golang.org/x//"
+      ],
+      "matchDepTypes": [
+        "require",
+        "indirect"
       ]
     },
     {
