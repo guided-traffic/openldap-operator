@@ -144,15 +144,27 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
-      - name: Install build tools and Docker Compose
+      - name: Install build tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential docker-compose
+          sudo apt-get install -y build-essential
+
+      - name: Set up Docker Compose V2
+        run: |
+          # Docker Compose V2 is already included in modern Docker installations
+          # Just verify and create alias if needed
+          docker compose version || (
+            echo "Installing Docker Compose V2 plugin..."
+            DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+            mkdir -p $DOCKER_CONFIG/cli-plugins
+            curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+            chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+          )
 
       - name: Verify Docker and Docker Compose
         run: |
           docker --version
-          docker-compose --version
+          docker compose version
 
       - name: Run integration tests with Docker
         run: make test-integration

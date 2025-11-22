@@ -25,6 +25,7 @@ VERBOSE=false
 COVERAGE=false
 LDAP_HOST="localhost"
 LDAP_PORT="389"
+DOCKER_COMPOSE_CMD="docker-compose"  # Default, will be detected in check_prerequisites
 
 # Function to print colored output
 print_status() {
@@ -135,10 +136,16 @@ check_prerequisites() {
             exit 1
         fi
 
-        if ! command_exists docker-compose; then
-            print_error "Docker Compose is not installed"
+        # Check for Docker Compose V2 (docker compose) or V1 (docker-compose)
+        if docker compose version >/dev/null 2>&1; then
+            DOCKER_COMPOSE_CMD="docker compose"
+        elif command_exists docker-compose; then
+            DOCKER_COMPOSE_CMD="docker-compose"
+        else
+            print_error "Docker Compose is not installed (tried 'docker compose' and 'docker-compose')"
             exit 1
         fi
+        print_status "Using Docker Compose: $DOCKER_COMPOSE_CMD"
     fi
 
     print_status "Prerequisites check passed"
@@ -156,11 +163,11 @@ setup_docker() {
     cd "$TEST_DIR"
 
     # Stop any existing containers
-    docker-compose -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
 
     # Start the services
     print_status "Starting OpenLDAP server..."
-    docker-compose -f "$DOCKER_COMPOSE_FILE" up -d openldap
+    $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d openldap
 
     # Wait for LDAP server to be ready
     print_status "Waiting for LDAP server to be ready..."
@@ -168,14 +175,14 @@ setup_docker() {
     local attempt=1
 
     while [[ $attempt -le $max_attempts ]]; do
-        if docker-compose -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapsearch -x -H ldap://localhost:1389 -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w "admin123" >/dev/null 2>&1; then
+        if $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapsearch -x -H ldap://localhost:1389 -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w "admin123" >/dev/null 2>&1; then
             print_status "LDAP server is ready"
             break
         fi
 
         if [[ $attempt -eq $max_attempts ]]; then
             print_error "LDAP server failed to start within timeout"
-            docker-compose -f "$DOCKER_COMPOSE_FILE" logs openldap
+            $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" logs openldap
             exit 1
         fi
 
@@ -187,7 +194,7 @@ setup_docker() {
     # Initialize test data
     print_status "Initializing test data..."
     if [[ -f "${TEST_DIR}/ldap-config/init.ldif" ]]; then
-        docker-compose -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapadd -x -H ldap://localhost:1389 -D "cn=admin,dc=example,dc=com" -w "admin123" -f /ldifs/init.ldif 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapadd -x -H ldap://localhost:1389 -D "cn=admin,dc=example,dc=com" -w "admin123" -f /ldifs/init.ldif 2>/dev/null || true
     fi
 }
 
@@ -293,7 +300,7 @@ cleanup() {
     if [[ "$SKIP_DOCKER" == "false" ]]; then
         print_status "Cleaning up Docker environment..."
         cd "$TEST_DIR"
-        docker-compose -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
     fi
 }
 
