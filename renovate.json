@@ -1,0 +1,214 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:enableMajor",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergeDigest",
+    ":automergeBranch"
+  ],
+  "schedule": ["at any time"],
+  "timezone": "Europe/Berlin",
+  "labels": [
+    "dependencies"
+  ],
+  "assignees": [
+    "hans-fischer"
+  ],
+  "reviewers": [
+    "hans-fischer"
+  ],
+  "prHourlyLimit": 10,
+  "prConcurrentLimit": 2,
+  "branchConcurrentLimit": 2,
+  "gitAuthor": "Renovate Bot <mail@s3ep.com>",
+  "forkProcessing": "disabled",
+  "packageRules": [
+    {
+      "description": "Automatically merge patch updates for Go modules",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Group minor and patch updates for Go standard library",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "golang.org/x packages",
+      "automerge": false,
+      "automergeType": "pr",
+      "matchPackageNames": [
+        "/^golang.org/x//"
+      ]
+    },
+    {
+      "description": "Group Kubernetes dependencies updates",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "Kubernetes dependencies",
+      "automerge": false,
+      "matchPackagePatterns": [
+        "^k8s\\.io/",
+        "^sigs\\.k8s\\.io/"
+      ]
+    },
+    {
+      "description": "Group Kubebuilder testing dependencies",
+      "matchManagers": [
+        "gomod"
+      ],
+      "groupName": "Testing frameworks",
+      "automerge": false,
+      "matchPackagePatterns": [
+        "^github\\.com/onsi/",
+        "^github\\.com/stretchr/"
+      ]
+    },
+    {
+      "description": "Automatically merge patch updates for npm packages",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Group semantic-release related packages",
+      "matchManagers": [
+        "npm"
+      ],
+      "groupName": "semantic-release packages",
+      "automerge": false,
+      "matchPackagePatterns": [
+        "^@semantic-release/",
+        "semantic-release",
+        "conventional-changelog"
+      ]
+    },
+    {
+      "description": "Helm chart version updates",
+      "matchManagers": [
+        "helm-values",
+        "helmfile"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "helm"
+      ]
+    },
+    {
+      "description": "Group Docker base image updates",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "Docker base images",
+      "automerge": false
+    },
+    {
+      "description": "Group GitHub Actions updates",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "GitHub Actions",
+      "automerge": false,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Require manual approval for major updates",
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "major-update"
+      ],
+      "reviewers": [
+        "hans-fischer"
+      ]
+    },
+    {
+      "description": "Special handling for security updates",
+      "matchDatasources": [
+        "go"
+      ],
+      "matchDepTypes": [
+        "indirect"
+      ],
+      "matchCurrentValue": "!/^v?0\\.0\\.0/",
+      "vulnerabilityAlerts": {
+        "enabled": true
+      },
+      "labels": [
+        "dependencies",
+        "security"
+      ],
+      "prPriority": 10
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security",
+      "dependencies"
+    ],
+    "assignees": [
+      "hans-fischer"
+    ],
+    "reviewers": [
+      "hans-fischer"
+    ]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": [
+      "before 3am on Monday"
+    ],
+    "commitMessageAction": "Lock file maintenance",
+    "automerge": true,
+    "automergeType": "pr"
+  },
+  "gomod": {
+    "enabled": true,
+    "postUpdateOptions": [
+      "gomodTidy",
+      "gomodUpdateImportPaths"
+    ]
+  },
+  "dockerfile": {
+    "enabled": true
+  },
+  "github-actions": {
+    "enabled": true
+  },
+  "npm": {
+    "enabled": true
+  },
+  "helm-values": {
+    "enabled": true,
+    "fileMatch": ["(^|/)values\\.ya?ml$"]
+  },
+  "commitMessagePrefix": "fix(deps): ",
+  "prBody": "This PR contains the following updates:\n\n| Package | Change | Age | Adoption | Passing | Confidence |\n|---|---|---|---|---|---|\n{{#each upgrades as |upgrade|}}\n|{{#if upgrade.homepage}}[{{upgrade.depName}}]({{upgrade.homepage}}){{else}}{{upgrade.depName}}{{/if}}|{{#if upgrade.displayFrom}}`{{upgrade.displayFrom}}` -> {{/if}}{{#if upgrade.displayTo}}`{{upgrade.displayTo}}`{{else}}`{{upgrade.newValue}}`{{/if}}|{{#if upgrade.packageDiffUrl}}[{{upgrade.age}}]({{upgrade.packageDiffUrl}}){{else}}{{upgrade.age}}{{/if}}|{{upgrade.adoption}}|{{upgrade.passing}}|{{upgrade.confidence}}|\n{{/each}}\n\n---\n\n### Release Notes\n{{#each upgrades as |upgrade|}}\n{{#if upgrade.hasReleaseNotes}}\n<details>\n<summary>{{upgrade.depName}}</summary>\n\n{{{upgrade.releaseNotes}}}\n</details>\n{{/if}}\n{{/each}}\n\n---\n\n### Configuration\n\n📅 **Schedule**: {{schedule}}\n\n🚦 **Automerge**: {{#if automerge}}Enabled{{else}}Disabled{{/if}}\n\n♻ **Rebasing**: {{#if rebaseWhen}}{{rebaseWhen}}{{else}}Whenever PR becomes conflicted{{/if}}\n\n🔕 **Ignore**: Close this PR and you won't be reminded about {{#if isSingleVersion}}this update{{else}}these updates{{/if}} again.\n\n---\n\n{{#if hasErrors}}\n### Errors\n\nRenovate encountered some errors while processing this repository:\n\n{{#each errors as |error|}}\n- {{error.message}}\n{{/each}}\n{{/if}}\n\n**Note**: This PR was generated by [Renovate](https://docs.renovatebot.com/).",
+  "configMigration": true
+}
