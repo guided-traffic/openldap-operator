@@ -54,10 +54,10 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Run all tests
+# Run all tests (excluding integration tests that require Docker)
 test: fmt vet
-	@echo "Running all tests..."
-	$(GOTEST) -v ./...
+	@echo "Running all unit tests..."
+	$(GOTEST) -v ./api/... ./internal/controller/...
 
 # Run unit tests only
 test-unit: fmt vet
@@ -67,13 +67,13 @@ test-unit: fmt vet
 	@echo "Coverage Summary:"
 	@$(GOCMD) tool cover -func=coverage.out | tail -1 || echo "No coverage data"
 
-# Run integration tests only
+# Run integration tests only (requires Docker)
 test-integration:
 	@echo "Running integration tests with Docker..."
 	./test/run-tests.sh
 
-# Run all tests (unit + integration)
-test-all: test test-integration
+# Run all tests (unit + integration) - integration tests run via run-tests.sh to avoid duplicates
+test-all: test-integration
 
 # Generate test coverage
 coverage: fmt vet

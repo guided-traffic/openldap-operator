@@ -220,16 +220,13 @@ run_unit_tests() {
         print_status "Testing API types with coverage..."
         go test -v ./api/v1/... -coverprofile coverage/api.out -covermode=atomic
 
-        print_status "Testing LDAP client with coverage..."
-        go test -v ./internal/ldap/... -coverprofile coverage/ldap.out -covermode=atomic
-
         print_status "Testing controllers with coverage..."
         go test -v ./internal/controller/... -coverprofile coverage/controller.out -covermode=atomic
 
         # Combine coverage files
         print_status "Combining coverage reports..."
         echo "mode: atomic" > coverage/unit.out
-        grep -h -v "^mode:" coverage/api.out coverage/ldap.out coverage/controller.out >> coverage/unit.out 2>/dev/null || true
+        grep -h -v "^mode:" coverage/api.out coverage/controller.out >> coverage/unit.out 2>/dev/null || true
 
         # Generate HTML and text reports
         go tool cover -html=coverage/unit.out -o coverage/unit-coverage.html
@@ -245,9 +242,6 @@ run_unit_tests() {
     else
         # Run unit tests for API types
         go test -v ./api/v1/... -cover
-
-        # Run unit tests for LDAP client
-        go test -v ./internal/ldap/... -cover
 
         # Run unit tests for controllers
         go test -v ./internal/controller/... -cover
@@ -283,7 +277,22 @@ run_integration_tests() {
 
     # Run integration tests from internal/ldap that use Docker
     print_status "Running LDAP client integration tests..."
-    go test -v ./internal/ldap/... -cover
+    if [[ "$COVERAGE" == "true" ]]; then
+        mkdir -p coverage
+        go test -v ./internal/ldap/... -coverprofile coverage/integration-ldap.out -covermode=atomic -cover
+
+        # Generate integration test coverage report
+        go tool cover -html=coverage/integration-ldap.out -o coverage/integration-ldap-coverage.html
+        go tool cover -func=coverage/integration-ldap.out | tee coverage/integration-ldap-coverage.txt
+
+        print_status "Integration test coverage report generated: coverage/integration-ldap-coverage.html"
+        echo ""
+        print_status "Integration Test Coverage Summary:"
+        tail -1 coverage/integration-ldap-coverage.txt
+        echo ""
+    else
+        go test -v ./internal/ldap/... -cover
+    fi
 
     print_status "Integration tests completed"
 }
@@ -331,6 +340,20 @@ EOF
             cat coverage/unit-coverage.txt >> coverage/reports/summary.txt
         fi
 
+        # Add integration test coverage summary
+        if [[ -f "coverage/integration-ldap-coverage.txt" ]]; then
+            cat >> coverage/reports/summary.txt << EOF
+
+=== Integration Test Coverage Summary ===
+
+EOF
+            echo "Overall Integration Test Coverage:" >> coverage/reports/summary.txt
+            tail -1 coverage/integration-ldap-coverage.txt >> coverage/reports/summary.txt
+            echo "" >> coverage/reports/summary.txt
+            echo "Package-by-Package Coverage:" >> coverage/reports/summary.txt
+            cat coverage/integration-ldap-coverage.txt >> coverage/reports/summary.txt
+        fi
+
         cat >> coverage/reports/summary.txt << EOF
 
 === Coverage Thresholds ===
@@ -338,16 +361,22 @@ EOF
 Recommended coverage targets:
 - Overall: >= 80%
 - API types: >= 90% (validation logic is critical)
-- LDAP client: >= 85% (core functionality)
+- LDAP client: >= 85% (core functionality, integration tests)
 - Controllers: >= 75% (complex reconciliation logic)
 
 === Coverage Files ===
 
+Unit Tests:
 - HTML Report: coverage/unit-coverage.html
 - Text Report: coverage/unit-coverage.txt
 - Raw Data: coverage/unit.out
 
-Open coverage/unit-coverage.html in your browser for detailed analysis.
+Integration Tests:
+- HTML Report: coverage/integration-ldap-coverage.html
+- Text Report: coverage/integration-ldap-coverage.txt
+- Raw Data: coverage/integration-ldap.out
+
+Open the HTML reports in your browser for detailed analysis.
 
 EOF
 
@@ -357,9 +386,13 @@ EOF
         if [[ -f "coverage/unit-coverage.txt" ]]; then
             echo "Unit Test Coverage: $(tail -1 coverage/unit-coverage.txt | awk '{print $3}')"
         fi
+        if [[ -f "coverage/integration-ldap-coverage.txt" ]]; then
+            echo "Integration Test Coverage: $(tail -1 coverage/integration-ldap-coverage.txt | awk '{print $3}')"
+        fi
         echo ""
         print_status "Detailed reports available:"
-        print_status "  - HTML: coverage/unit-coverage.html"
+        print_status "  - Unit Tests HTML: coverage/unit-coverage.html"
+        print_status "  - Integration Tests HTML: coverage/integration-ldap-coverage.html"
         print_status "  - Summary: coverage/reports/summary.txt"
         echo ""
 
