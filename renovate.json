@@ -52,7 +52,9 @@
       "matchDepTypes": [
         "require",
         "indirect"
-      ]
+      ],
+      "rangeStrategy": "update-lockfile",
+      "enabled": true
     },
     {
       "description": "Group Kubernetes dependencies updates",
@@ -162,6 +164,9 @@
         "indirect"
       ],
       "matchCurrentValue": "!/^v?0\\.0\\.0/",
+      "excludePackageNames": [
+        "/^golang.org/x//"
+      ],
       "vulnerabilityAlerts": {
         "enabled": true
       },
@@ -196,7 +201,8 @@
     "postUpdateOptions": [
       "gomodTidy",
       "gomodUpdateImportPaths"
-    ]
+    ],
+    "rangeStrategy": "update-lockfile"
   },
   "dockerfile": {
     "enabled": true
