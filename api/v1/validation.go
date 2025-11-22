@@ -22,6 +22,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
+const (
+	// Default organizational unit names
+	defaultUsersOU  = "users"
+	defaultGroupsOU = "groups"
+)
+
 // validateLDAPServerSpec validates the LDAPServerSpec
 func validateLDAPServerSpec(spec *LDAPServerSpec, fldPath *field.Path) field.ErrorList {
 	var errs field.ErrorList
@@ -229,7 +235,7 @@ func (s *LDAPServerSpec) SetDefaults() {
 // SetDefaults sets default values for LDAPUserSpec
 func (s *LDAPUserSpec) SetDefaults() {
 	if s.OrganizationalUnit == "" {
-		s.OrganizationalUnit = "users"
+		s.OrganizationalUnit = defaultUsersOU
 	}
 
 	if s.Enabled == nil {
@@ -241,7 +247,7 @@ func (s *LDAPUserSpec) SetDefaults() {
 // SetDefaults sets default values for LDAPGroupSpec
 func (s *LDAPGroupSpec) SetDefaults() {
 	if s.OrganizationalUnit == "" {
-		s.OrganizationalUnit = "groups"
+		s.OrganizationalUnit = defaultGroupsOU
 	}
 
 	if s.GroupType == "" {

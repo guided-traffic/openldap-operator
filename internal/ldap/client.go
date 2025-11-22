@@ -26,6 +26,13 @@ import (
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
+const (
+	// LDAP group membership attribute names
+	attrMember       = "member"
+	attrUniqueMember = "uniqueMember"
+	attrMemberUid    = "memberUid"
+)
+
 // Client represents an LDAP client wrapper
 type Client struct {
 	conn   *ldap.Conn
@@ -388,7 +395,7 @@ func (c *Client) CreateGroup(groupSpec *openldapv1.LDAPGroupSpec) error {
 	// Add initial member for groupOfNames (required)
 	if groupSpec.GroupType == openldapv1.GroupTypeGroupOfNames {
 		attrs = append(attrs, ldap.Attribute{
-			Type: "member",
+			Type: attrMember,
 			Vals: []string{c.config.BindDN}, // Use bind DN as initial member
 		})
 	}
@@ -451,11 +458,11 @@ func (c *Client) AddUserToGroup(username, userOU, groupName, groupOU string, gro
 
 	switch groupType {
 	case openldapv1.GroupTypeGroupOfNames:
-		modifyRequest.Add("member", []string{userDN})
+		modifyRequest.Add(attrMember, []string{userDN})
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		modifyRequest.Add("uniqueMember", []string{userDN})
+		modifyRequest.Add(attrUniqueMember, []string{userDN})
 	case openldapv1.GroupTypePosix:
-		modifyRequest.Add("memberUid", []string{username})
+		modifyRequest.Add(attrMemberUid, []string{username})
 	}
 
 	return c.conn.Modify(modifyRequest)
@@ -470,11 +477,11 @@ func (c *Client) RemoveUserFromGroup(username, userOU, groupName, groupOU string
 
 	switch groupType {
 	case openldapv1.GroupTypeGroupOfNames:
-		modifyRequest.Delete("member", []string{userDN})
+		modifyRequest.Delete(attrMember, []string{userDN})
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		modifyRequest.Delete("uniqueMember", []string{userDN})
+		modifyRequest.Delete(attrUniqueMember, []string{userDN})
 	case openldapv1.GroupTypePosix:
-		modifyRequest.Delete("memberUid", []string{username})
+		modifyRequest.Delete(attrMemberUid, []string{username})
 	}
 
 	return c.conn.Modify(modifyRequest)
@@ -487,13 +494,13 @@ func (c *Client) GetGroupMembers(groupName, ou string, groupType openldapv1.Grou
 	var attribute string
 	switch groupType {
 	case openldapv1.GroupTypeGroupOfNames:
-		attribute = "member"
+		attribute = attrMember
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		attribute = "uniqueMember"
+		attribute = attrUniqueMember
 	case openldapv1.GroupTypePosix:
-		attribute = "memberUid"
+		attribute = attrMemberUid
 	default:
-		attribute = "member"
+		attribute = attrMember
 	}
 
 	searchRequest := ldap.NewSearchRequest(

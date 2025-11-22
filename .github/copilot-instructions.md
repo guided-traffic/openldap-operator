@@ -113,5 +113,7 @@ Currently supports posixGroup, groupOfNames, groupOfUniqueNames. See `internal/l
 
 - **External LDAP Only**: This operator does NOT deploy/manage LDAP servers themselves - it connects to existing ones
 - **TLS Default**: TLS enabled unless explicitly disabled - affects both controller connections and client library
-- **Test Coverage Goal**: Maintain 90%+ coverage (currently 90.6%) - see `docs/COVERAGE_REPORT.md`
+- **Test Coverage Goal**: Maintain a high test coverage
 - **No Webhooks Currently**: Validation is type-level + programmatic, no admission webhooks deployed
+- **Version control**: Never commit to git yourself
+- **Test-files**: There should be only one test-file pro code-file.

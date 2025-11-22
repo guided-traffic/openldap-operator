@@ -375,7 +375,7 @@ func (r *LDAPGroupReconciler) updateGroupStatus(ctx context.Context, conn *ldap.
 	// Update status
 	ldapGroup.Status.DN = groupDN
 	ldapGroup.Status.Members = currentMembers
-	ldapGroup.Status.MemberCount = int32(len(currentMembers))
+	ldapGroup.Status.MemberCount = int32(len(currentMembers)) //nolint:gosec // Member count is bounded by LDAP server limits
 
 	logger.Info("Updated group status", "memberCount", ldapGroup.Status.MemberCount)
 	return nil
