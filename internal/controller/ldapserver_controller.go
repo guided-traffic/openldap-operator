@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -119,7 +120,25 @@ func (r *LDAPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		ldapServer.Status.Conditions = append(ldapServer.Status.Conditions, condition)
 	}
 
-	if err := r.Status().Update(ctx, ldapServer); err != nil {
+	// Retry status update on conflict
+	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest version of the resource
+		latest := &openldapv1.LDAPServer{}
+		if err := r.Get(ctx, types.NamespacedName{Name: ldapServer.Name, Namespace: ldapServer.Namespace}, latest); err != nil {
+			return err
+		}
+
+		// Update status fields on latest version
+		latest.Status.ConnectionStatus = connectionStatus
+		latest.Status.Message = message
+		latest.Status.LastChecked = ldapServer.Status.LastChecked
+		latest.Status.ObservedGeneration = ldapServer.Generation
+		latest.Status.Conditions = ldapServer.Status.Conditions
+
+		return r.Status().Update(ctx, latest)
+	})
+
+	if err != nil {
 		logger.Error(err, "Failed to update LDAPServer status")
 		return ctrl.Result{}, err
 	}

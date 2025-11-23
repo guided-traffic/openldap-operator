@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -526,7 +527,26 @@ func (r *LDAPUserReconciler) updateStatus(ctx context.Context, ldapUser *openlda
 		ldapUser.Status.Conditions = append(ldapUser.Status.Conditions, condition)
 	}
 
-	if err := r.Status().Update(ctx, ldapUser); err != nil {
+	// Retry status update on conflict
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest version of the resource
+		latest := &openldapv1.LDAPUser{}
+		if err := r.Get(ctx, types.NamespacedName{Name: ldapUser.Name, Namespace: ldapUser.Namespace}, latest); err != nil {
+			return err
+		}
+
+		// Update status fields on latest version
+		latest.Status.Phase = phase
+		latest.Status.Message = message
+		latest.Status.ObservedGeneration = ldapUser.Generation
+		latest.Status.Conditions = ldapUser.Status.Conditions
+		latest.Status.ActualHomeDirectory = ldapUser.Status.ActualHomeDirectory
+		latest.Status.MissingGroups = ldapUser.Status.MissingGroups
+
+		return r.Status().Update(ctx, latest)
+	})
+
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 

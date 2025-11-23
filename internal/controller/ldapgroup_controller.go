@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -425,7 +426,25 @@ func (r *LDAPGroupReconciler) updateStatus(ctx context.Context, ldapGroup *openl
 
 	logger.Info("Updating LDAPGroup status", "phase", phase, "message", message)
 
-	if err := r.Status().Update(ctx, ldapGroup); err != nil {
+	// Retry status update on conflict
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest version of the resource
+		latest := &openldapv1.LDAPGroup{}
+		if err := r.Get(ctx, types.NamespacedName{Name: ldapGroup.Name, Namespace: ldapGroup.Namespace}, latest); err != nil {
+			return err
+		}
+
+		// Update status fields on latest version
+		latest.Status.Phase = phase
+		latest.Status.Message = message
+		latest.Status.ObservedGeneration = ldapGroup.Generation
+		latest.Status.Conditions = ldapGroup.Status.Conditions
+		latest.Status.Members = ldapGroup.Status.Members
+
+		return r.Status().Update(ctx, latest)
+	})
+
+	if err != nil {
 		logger.Error(err, "Failed to update LDAPGroup status")
 		return ctrl.Result{}, err
 	}
