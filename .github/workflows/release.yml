@@ -169,6 +169,28 @@ jobs:
       - name: Run integration tests with Docker
         run: make test-integration
 
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
       - name: Create Kind cluster
         uses: helm/kind-action@v1.13.0
         with:
@@ -370,7 +392,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Release
     runs-on: self-hosted
-    needs: [unit-tests, gosec, govulncheck, linter, integration-tests]
+    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests]
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
