@@ -33,7 +33,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 	ldapClient "github.com/guided-traffic/openldap-operator/internal/ldap"
@@ -619,5 +621,49 @@ func (r *LDAPUserReconciler) handleDeletion(ctx context.Context, ldapUser *openl
 func (r *LDAPUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openldapv1.LDAPUser{}).
+		Watches(
+			&openldapv1.LDAPServer{},
+			handler.EnqueueRequestsFromMapFunc(r.findUsersForServer),
+		).
 		Complete(r)
+}
+
+// findUsersForServer finds all LDAPUsers that reference a given LDAPServer
+func (r *LDAPUserReconciler) findUsersForServer(ctx context.Context, server client.Object) []reconcile.Request {
+	ldapServer, ok := server.(*openldapv1.LDAPServer)
+	if !ok {
+		return nil
+	}
+
+	// List all LDAPUsers
+	userList := &openldapv1.LDAPUserList{}
+	if err := r.List(ctx, userList); err != nil {
+		return nil
+	}
+
+	// Find users that reference this server
+	var requests []reconcile.Request
+	for _, user := range userList.Items {
+		// Check if this user references the server
+		if user.Spec.LDAPServerRef.Name == ldapServer.Name {
+			// Check if they're in the same namespace or if namespace is not specified
+			if user.Spec.LDAPServerRef.Namespace == "" && user.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      user.Name,
+						Namespace: user.Namespace,
+					},
+				})
+			} else if user.Spec.LDAPServerRef.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      user.Name,
+						Namespace: user.Namespace,
+					},
+				})
+			}
+		}
+	}
+
+	return requests
 }

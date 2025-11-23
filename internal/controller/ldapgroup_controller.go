@@ -32,7 +32,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
@@ -526,5 +528,49 @@ func (r *LDAPGroupReconciler) handleDeletion(ctx context.Context, ldapGroup *ope
 func (r *LDAPGroupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openldapv1.LDAPGroup{}).
+		Watches(
+			&openldapv1.LDAPServer{},
+			handler.EnqueueRequestsFromMapFunc(r.findGroupsForServer),
+		).
 		Complete(r)
+}
+
+// findGroupsForServer finds all LDAPGroups that reference a given LDAPServer
+func (r *LDAPGroupReconciler) findGroupsForServer(ctx context.Context, server client.Object) []reconcile.Request {
+	ldapServer, ok := server.(*openldapv1.LDAPServer)
+	if !ok {
+		return nil
+	}
+
+	// List all LDAPGroups
+	groupList := &openldapv1.LDAPGroupList{}
+	if err := r.List(ctx, groupList); err != nil {
+		return nil
+	}
+
+	// Find groups that reference this server
+	var requests []reconcile.Request
+	for _, group := range groupList.Items {
+		// Check if this group references the server
+		if group.Spec.LDAPServerRef.Name == ldapServer.Name {
+			// Check if they're in the same namespace or if namespace is not specified
+			if group.Spec.LDAPServerRef.Namespace == "" && group.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      group.Name,
+						Namespace: group.Namespace,
+					},
+				})
+			} else if group.Spec.LDAPServerRef.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      group.Name,
+						Namespace: group.Namespace,
+					},
+				})
+			}
+		}
+	}
+
+	return requests
 }
