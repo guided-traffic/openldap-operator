@@ -24,9 +24,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      {{- with include "openldap-operator.imagePullSecrets" . }}
-      {{ . }}
-      {{- end }}
+      {{- include "openldap-operator.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "openldap-operator.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.operator.podSecurityContext | nindent 8 }}

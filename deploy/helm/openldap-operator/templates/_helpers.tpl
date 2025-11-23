@@ -114,10 +114,10 @@ Create image pull secrets
 */}}
 {{- define "openldap-operator.imagePullSecrets" -}}
 {{- $secrets := .Values.global.imagePullSecrets | default .Values.imagePullSecrets -}}
-{{- if $secrets }}
+{{- if $secrets -}}
 imagePullSecrets:
 {{- range $secrets }}
-  - name: {{ . }}
+- name: {{ . }}
 {{- end }}
 {{- end }}
 {{- end }}
