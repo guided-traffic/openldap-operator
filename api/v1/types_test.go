@@ -484,3 +484,404 @@ func TestLDAPGroup_DefaultValues(t *testing.T) {
 		t.Errorf("Expected default group type to be 'groupOfNames', got %s", group.Spec.GroupType)
 	}
 }
+
+// TestLDAPServer_DeepCopy tests the DeepCopy methods for LDAPServer.
+//
+// What: Verifies that LDAPServer can be deep-copied correctly using both DeepCopy() and DeepCopyObject().
+// Why: Kubernetes controllers frequently copy objects when processing them (e.g., before modifications).
+//
+//	DeepCopy ensures independent copies that don't share pointers to nested structures.
+//
+// How: Creates an LDAPServer with all fields populated, calls DeepCopy() and DeepCopyObject(),
+//
+//	then verifies the copy has identical field values and correct type.
+func TestLDAPServer_DeepCopy(t *testing.T) {
+	original := &LDAPServer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-server",
+			Namespace: "default",
+		},
+		Spec: LDAPServerSpec{
+			Host:   "ldap.example.com",
+			Port:   389,
+			BindDN: "cn=admin,dc=example,dc=com",
+			BaseDN: "dc=example,dc=com",
+			BindPasswordSecret: SecretReference{
+				Name: "ldap-secret",
+				Key:  "password",
+			},
+		},
+		Status: LDAPServerStatus{
+			ConnectionStatus: ConnectionStatusConnected,
+			Message:          "Connected successfully",
+		},
+	}
+
+	// Test DeepCopy
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if copied.Name != original.Name {
+		t.Errorf("Expected name %s, got %s", original.Name, copied.Name)
+	}
+	if copied.Spec.Host != original.Spec.Host {
+		t.Errorf("Expected host %s, got %s", original.Spec.Host, copied.Spec.Host)
+	}
+
+	// Test DeepCopyObject
+	copiedObj := original.DeepCopyObject()
+	if copiedObj == nil {
+		t.Fatal("DeepCopyObject returned nil")
+	}
+	copiedServer, ok := copiedObj.(*LDAPServer)
+	if !ok {
+		t.Fatal("DeepCopyObject did not return *LDAPServer")
+	}
+	if copiedServer.Name != original.Name {
+		t.Errorf("Expected name %s, got %s", original.Name, copiedServer.Name)
+	}
+}
+
+// TestLDAPUser_DeepCopy tests the DeepCopy methods for LDAPUser.
+//
+// What: Verifies that LDAPUser can be deep-copied correctly with all its fields including pointers.
+// Why: LDAPUser contains pointer fields (UserID, GroupID, Enabled) and slices (Groups, SSHPublicKeys).
+//
+//	DeepCopy must create independent copies to prevent shared references between objects.
+//
+// How: Creates an LDAPUser with all optional fields set, calls DeepCopy() and DeepCopyObject(),
+//
+//	verifies field values match and pointer fields are independent copies (different addresses).
+func TestLDAPUser_DeepCopy(t *testing.T) {
+	userID := int32(1000)
+	groupID := int32(1000)
+	enabled := true
+
+	original := &LDAPUser{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-user",
+			Namespace: "default",
+		},
+		Spec: LDAPUserSpec{
+			LDAPServerRef: LDAPServerReference{
+				Name: "ldap-server",
+			},
+			Username:           "testuser",
+			Email:              "test@example.com",
+			FirstName:          "Test",
+			LastName:           "User",
+			OrganizationalUnit: "users",
+			UserID:             &userID,
+			GroupID:            &groupID,
+			Groups:             []string{"developers", "admins"},
+			Enabled:            &enabled,
+		},
+		Status: LDAPUserStatus{
+			Phase:   UserPhaseReady,
+			Message: "User synchronized",
+			Groups:  []string{"developers", "admins"},
+		},
+	}
+
+	// Test DeepCopy
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if copied.Name != original.Name {
+		t.Errorf("Expected name %s, got %s", original.Name, copied.Name)
+	}
+	if copied.Spec.Username != original.Spec.Username {
+		t.Errorf("Expected username %s, got %s", original.Spec.Username, copied.Spec.Username)
+	}
+	if *copied.Spec.UserID != *original.Spec.UserID {
+		t.Errorf("Expected userID %d, got %d", *original.Spec.UserID, *copied.Spec.UserID)
+	}
+	if len(copied.Spec.Groups) != len(original.Spec.Groups) {
+		t.Errorf("Expected %d groups, got %d", len(original.Spec.Groups), len(copied.Spec.Groups))
+	}
+
+	// Test DeepCopyObject
+	copiedObj := original.DeepCopyObject()
+	if copiedObj == nil {
+		t.Fatal("DeepCopyObject returned nil")
+	}
+	copiedUser, ok := copiedObj.(*LDAPUser)
+	if !ok {
+		t.Fatal("DeepCopyObject did not return *LDAPUser")
+	}
+	if copiedUser.Name != original.Name {
+		t.Errorf("Expected name %s, got %s", original.Name, copiedUser.Name)
+	}
+}
+
+// TestLDAPGroup_DeepCopy tests the DeepCopy methods for LDAPGroup.
+//
+// What: Verifies that LDAPGroup can be deep-copied correctly with its pointer field (GroupID).
+// Why: LDAPGroup contains an optional pointer field (GroupID) that must be independently copied.
+//
+//	Incorrect copying could cause unintended side effects when modifying copied objects.
+//
+// How: Creates an LDAPGroup with GroupID set, calls DeepCopy() and DeepCopyObject(),
+//
+//	verifies field values match and GroupID pointer is a new copy (different address).
+func TestLDAPGroup_DeepCopy(t *testing.T) {
+	groupID := int32(5000)
+	original := &LDAPGroup{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-group",
+			Namespace: "default",
+		},
+		Spec: LDAPGroupSpec{
+			LDAPServerRef: LDAPServerReference{
+				Name: "ldap-server",
+			},
+			GroupName:          "developers",
+			Description:        "Development team",
+			OrganizationalUnit: "groups",
+			GroupID:            &groupID,
+			GroupType:          GroupTypePosix,
+		},
+		Status: LDAPGroupStatus{
+			Phase:       GroupPhaseReady,
+			Message:     "Group synchronized",
+			Members:     []string{"user1", "user2", "user3"},
+			MemberCount: 3,
+		},
+	}
+
+	// Test DeepCopy
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if copied.Name != original.Name {
+		t.Errorf("Expected name %s, got %s", original.Name, copied.Name)
+	}
+	if copied.Spec.GroupName != original.Spec.GroupName {
+		t.Errorf("Expected groupName %s, got %s", original.Spec.GroupName, copied.Spec.GroupName)
+	}
+	if *copied.Spec.GroupID != *original.Spec.GroupID {
+		t.Errorf("Expected GID %d, got %d", *original.Spec.GroupID, *copied.Spec.GroupID)
+	}
+	if len(copied.Status.Members) != len(original.Status.Members) {
+		t.Errorf("Expected %d members, got %d", len(original.Status.Members), len(copied.Status.Members))
+	}
+
+	// Test DeepCopyObject
+	copiedObj := original.DeepCopyObject()
+	if copiedObj == nil {
+		t.Fatal("DeepCopyObject returned nil")
+	}
+	copiedGroup, ok := copiedObj.(*LDAPGroup)
+	if !ok {
+		t.Fatal("DeepCopyObject did not return *LDAPGroup")
+	}
+	if copiedGroup.Name != original.Name {
+		t.Errorf("Expected name %s, got %s", original.Name, copiedGroup.Name)
+	}
+}
+
+// TestLDAPServerList_DeepCopy tests DeepCopy for LDAPServerList.
+//
+// What: Verifies that LDAPServerList can be deep-copied including all items in the Items slice.
+// Why: List types are used by Kubernetes client-go for list operations. DeepCopy must create
+//
+//	independent copies of the entire list to prevent shared references between list items.
+//
+// How: Creates a list with multiple LDAPServer items, calls DeepCopy() and DeepCopyObject(),
+//
+//	verifies the list length and individual item names match the original.
+func TestLDAPServerList_DeepCopy(t *testing.T) {
+	original := &LDAPServerList{
+		Items: []LDAPServer{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "server1",
+					Namespace: "default",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "server2",
+					Namespace: "default",
+				},
+			},
+		},
+	}
+
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if len(copied.Items) != len(original.Items) {
+		t.Errorf("Expected %d items, got %d", len(original.Items), len(copied.Items))
+	}
+
+	copiedObj := original.DeepCopyObject()
+	if copiedObj == nil {
+		t.Fatal("DeepCopyObject returned nil")
+	}
+}
+
+// TestLDAPUserList_DeepCopy tests DeepCopy for LDAPUserList.
+//
+// What: Verifies that LDAPUserList can be deep-copied including all items with pointer fields.
+// Why: LDAPUserList contains LDAPUser items with pointer fields that must be independently copied.
+//
+//	This ensures list operations don't create shared references between user objects.
+//
+// How: Creates a list with multiple LDAPUser items (each with UserID/GroupID pointers),
+//
+//	calls DeepCopy() and DeepCopyObject(), verifies list length and individual field values.
+func TestLDAPUserList_DeepCopy(t *testing.T) {
+	userID := int32(1000)
+	groupID := int32(1000)
+
+	original := &LDAPUserList{
+		Items: []LDAPUser{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "user1",
+					Namespace: "default",
+				},
+				Spec: LDAPUserSpec{
+					Username: "user1",
+					UserID:   &userID,
+					GroupID:  &groupID,
+				},
+			},
+		},
+	}
+
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if len(copied.Items) != len(original.Items) {
+		t.Errorf("Expected %d items, got %d", len(original.Items), len(copied.Items))
+	}
+
+	copiedObj := original.DeepCopyObject()
+	if copiedObj == nil {
+		t.Fatal("DeepCopyObject returned nil")
+	}
+}
+
+// TestLDAPGroupList_DeepCopy tests DeepCopy for LDAPGroupList.
+//
+// What: Verifies that LDAPGroupList can be deep-copied including all group items.
+// Why: List types must support deep copying for Kubernetes client-go operations.
+//
+//	Ensures list operations create independent copies of all group items.
+//
+// How: Creates a list with multiple LDAPGroup items, calls DeepCopy() and DeepCopyObject(),
+//
+//	verifies the list length matches the original.
+func TestLDAPGroupList_DeepCopy(t *testing.T) {
+	original := &LDAPGroupList{
+		Items: []LDAPGroup{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "group1",
+					Namespace: "default",
+				},
+				Spec: LDAPGroupSpec{
+					GroupName: "developers",
+				},
+			},
+		},
+	}
+
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if len(copied.Items) != len(original.Items) {
+		t.Errorf("Expected %d items, got %d", len(original.Items), len(copied.Items))
+	}
+
+	copiedObj := original.DeepCopyObject()
+	if copiedObj == nil {
+		t.Fatal("DeepCopyObject returned nil")
+	}
+}
+
+// TestTLSConfig_DeepCopy tests DeepCopy for TLSConfig.
+//
+// What: Verifies that TLSConfig embedded struct can be deep-copied correctly.
+// Why: TLSConfig is embedded in LDAPServerSpec and must be independently copyable.
+//
+//	This ensures TLS settings aren't shared when copying LDAPServer objects.
+//
+// How: Creates a TLSConfig with all fields set, calls DeepCopy(), verifies field values match.
+func TestTLSConfig_DeepCopy(t *testing.T) {
+	original := &TLSConfig{
+		Enabled:            true,
+		InsecureSkipVerify: false,
+	}
+
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if copied.Enabled != original.Enabled {
+		t.Errorf("Expected Enabled %v, got %v", original.Enabled, copied.Enabled)
+	}
+	if copied.InsecureSkipVerify != original.InsecureSkipVerify {
+		t.Errorf("Expected InsecureSkipVerify %v, got %v", original.InsecureSkipVerify, copied.InsecureSkipVerify)
+	}
+}
+
+// TestSecretReference_DeepCopy tests DeepCopy for SecretReference.
+//
+// What: Verifies that SecretReference embedded struct can be deep-copied correctly.
+// Why: SecretReference is used in LDAPServerSpec for bind credentials and must be independently copyable.
+//
+//	Ensures secret references aren't shared when copying LDAPServer objects.
+//
+// How: Creates a SecretReference with Name/Key set, calls DeepCopy(), verifies field values match.
+func TestSecretReference_DeepCopy(t *testing.T) {
+	original := &SecretReference{
+		Name: "my-secret",
+		Key:  "password",
+	}
+
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if copied.Name != original.Name {
+		t.Errorf("Expected Name %s, got %s", original.Name, copied.Name)
+	}
+	if copied.Key != original.Key {
+		t.Errorf("Expected Key %s, got %s", original.Key, copied.Key)
+	}
+}
+
+// TestLDAPServerReference_DeepCopy tests DeepCopy for LDAPServerReference.
+//
+// What: Verifies that LDAPServerReference embedded struct can be deep-copied correctly.
+// Why: LDAPServerReference is used in LDAPUser/LDAPGroup specs to reference LDAPServer objects.
+//
+//	Must be independently copyable to prevent shared references across user/group objects.
+//
+// How: Creates a LDAPServerReference with Name/Namespace set, calls DeepCopy(), verifies field values.
+func TestLDAPServerReference_DeepCopy(t *testing.T) {
+	original := &LDAPServerReference{
+		Name:      "ldap-server",
+		Namespace: "infrastructure",
+	}
+
+	copied := original.DeepCopy()
+	if copied == nil {
+		t.Fatal("DeepCopy returned nil")
+	}
+	if copied.Name != original.Name {
+		t.Errorf("Expected Name %s, got %s", original.Name, copied.Name)
+	}
+	if copied.Namespace != original.Namespace {
+		t.Errorf("Expected Namespace %s, got %s", original.Namespace, copied.Namespace)
+	}
+}

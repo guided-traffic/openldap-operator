@@ -23,6 +23,9 @@ import (
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
+// TestClient_buildUserDN tests the construction of Distinguished Names for LDAP users.
+// DNs follow the pattern: uid=<username>,ou=<ou>,<baseDN>
+// The OU component is optional and can be empty.
 func TestClient_buildUserDN(t *testing.T) {
 	client := &Client{
 		config: &openldapv1.LDAPServerSpec{
@@ -66,6 +69,9 @@ func TestClient_buildUserDN(t *testing.T) {
 	}
 }
 
+// TestClient_buildGroupDN tests the construction of Distinguished Names for LDAP groups.
+// DNs follow the pattern: cn=<groupName>,ou=<ou>,<baseDN>
+// The OU component is optional and can be empty.
 func TestClient_buildGroupDN(t *testing.T) {
 	client := &Client{
 		config: &openldapv1.LDAPServerSpec{
@@ -109,6 +115,9 @@ func TestClient_buildGroupDN(t *testing.T) {
 	}
 }
 
+// TestNewClient_ValidationOnly validates client creation with various LDAP server specifications.
+// Tests connection parameters including TLS configuration.
+// Without a real LDAP server, connection attempts will fail (expected behavior).
 func TestNewClient_ValidationOnly(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -161,6 +170,8 @@ func TestNewClient_ValidationOnly(t *testing.T) {
 	}
 }
 
+// TestCreateUserAttributes validates that all required LDAP user attributes are properly set.
+// This is a unit test that doesn't require an actual LDAP connection.
 func TestCreateUserAttributes(t *testing.T) {
 	userSpec := &openldapv1.LDAPUserSpec{
 		Username:      "testuser",
@@ -195,6 +206,9 @@ func TestCreateUserAttributes(t *testing.T) {
 	}
 }
 
+// TestCreateUserAttributes_DefaultHomeDirectory tests the automatic home directory generation.
+// When homeDirectory is empty or unspecified, the system auto-generates /home/<username>
+// to ensure POSIX compliance.
 func TestCreateUserAttributes_DefaultHomeDirectory(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -248,6 +262,9 @@ func TestCreateUserAttributes_DefaultHomeDirectory(t *testing.T) {
 	}
 }
 
+// TestCreateGroupAttributes validates that all required LDAP group attributes are properly set.
+// This includes validation of groupType against supported types: posixGroup, groupOfNames,
+// and groupOfUniqueNames.
 func TestCreateGroupAttributes(t *testing.T) {
 	groupSpec := &openldapv1.LDAPGroupSpec{
 		GroupName:   "developers",
@@ -288,6 +305,9 @@ func TestCreateGroupAttributes(t *testing.T) {
 	}
 }
 
+// TestGroupTypeObjectClasses tests the mapping between GroupType enum values and LDAP objectClass attributes.
+// Each group type (posixGroup, groupOfNames, groupOfUniqueNames) must be assigned the correct
+// objectClass values for proper LDAP schema compliance.
 func TestGroupTypeObjectClasses(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -339,6 +359,11 @@ func TestGroupTypeObjectClasses(t *testing.T) {
 	}
 }
 
+// TestGroupMemberAttributes tests the selection of member attribute names based on group type.
+// Different LDAP group types use different attributes for membership:
+//   - groupOfNames: "member"
+//   - groupOfUniqueNames: "uniqueMember"
+//   - posixGroup: "memberUid"
 func TestGroupMemberAttributes(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -383,34 +408,9 @@ func TestGroupMemberAttributes(t *testing.T) {
 	}
 }
 
-// Benchmark tests
-func BenchmarkBuildUserDN(b *testing.B) {
-	client := &Client{
-		config: &openldapv1.LDAPServerSpec{
-			BaseDN: "dc=example,dc=com",
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		client.buildUserDN("testuser", "users")
-	}
-}
-
-func BenchmarkBuildGroupDN(b *testing.B) {
-	client := &Client{
-		config: &openldapv1.LDAPServerSpec{
-			BaseDN: "dc=example,dc=com",
-		},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		client.buildGroupDN("testgroup", "groups")
-	}
-}
-
-// Table-driven tests for complex scenarios
+// TestDNBuildingEdgeCases tests DN construction with complex multi-level base DNs.
+// Verifies that user and group DNs are correctly built when the base DN contains
+// multiple organizational units (e.g., "ou=people,dc=company,dc=org").
 func TestDNBuildingEdgeCases(t *testing.T) {
 	client := &Client{
 		config: &openldapv1.LDAPServerSpec{
@@ -462,5 +462,35 @@ func TestDNBuildingEdgeCases(t *testing.T) {
 				t.Errorf("Expected %s, got %s", tt.expected, result)
 			}
 		})
+	}
+}
+
+// BenchmarkBuildUserDN measures the performance of user DN construction
+// to ensure it remains efficient under high load.
+func BenchmarkBuildUserDN(b *testing.B) {
+	client := &Client{
+		config: &openldapv1.LDAPServerSpec{
+			BaseDN: "dc=example,dc=com",
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		client.buildUserDN("testuser", "users")
+	}
+}
+
+// BenchmarkBuildGroupDN measures the performance of group DN construction
+// to ensure it remains efficient under high load.
+func BenchmarkBuildGroupDN(b *testing.B) {
+	client := &Client{
+		config: &openldapv1.LDAPServerSpec{
+			BaseDN: "dc=example,dc=com",
+		},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		client.buildGroupDN("testgroup", "groups")
 	}
 }

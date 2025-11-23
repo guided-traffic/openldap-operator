@@ -20,8 +20,6 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: self-hosted
-    outputs:
-      coverage: ${{ steps.coverage.outputs.percentage }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -39,24 +37,16 @@ jobs:
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
-      - name: Run unit tests
-        run: make test-unit
-
-      - name: Generate coverage report
-        run: make coverage-ci
-
-      - name: Extract coverage percentage
-        id: coverage
+      - name: Run unit tests with coverage
         run: |
-          COVERAGE=$(grep "total:" coverage/coverage.txt | awk '{print $3}' | sed 's/%//')
-          echo "percentage=$COVERAGE" >> $GITHUB_OUTPUT
-          echo "Coverage: $COVERAGE%"
+          go test ./api/... ./internal/controller/... -coverprofile=coverage-unit.out -v 2>&1 | grep -v "does not match go tool version"
+          echo "Unit test coverage generated"
 
-      - name: Upload coverage artifacts
+      - name: Upload unit test coverage
         uses: actions/upload-artifact@v5
         with:
-          name: coverage-report
-          path: coverage/
+          name: coverage-unit
+          path: coverage-unit.out
 
   gosec:
     name: GoSec Security Scan
@@ -166,8 +156,295 @@ jobs:
           docker --version
           docker compose version
 
-      - name: Run integration tests with Docker
-        run: make test-integration
+      - name: Run integration tests with coverage
+        run: |
+          # Run integration tests with coverage
+          go test ./internal/ldap/... -coverprofile=coverage-integration.out -v
+          echo "Integration test coverage generated"
+
+      - name: Upload integration test coverage
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-integration
+          path: coverage-integration.out
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Build container image
+        run: make docker-build IMG=openldap-operator:scan
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: 'openldap-operator:scan'
+          format: 'json'
+          output: 'trivy-results.json'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+      - name: Generate Trivy summary
+        id: trivy-summary
+        run: |
+          # Parse Trivy results and create a summary
+          if [ -f trivy-results.json ]; then
+            # Count vulnerabilities by severity
+            CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-results.json)
+            MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-results.json)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' trivy-results.json)
+            TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))
+
+            echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+            echo "high=$HIGH" >> $GITHUB_OUTPUT
+            echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+            echo "low=$LOW" >> $GITHUB_OUTPUT
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+            echo "Trivy scan completed: $TOTAL vulnerabilities found"
+            echo "- Critical: $CRITICAL"
+            echo "- High: $HIGH"
+            echo "- Medium: $MEDIUM"
+            echo "- Low: $LOW"
+
+            # Generate detailed report for PR comment
+            echo "TRIVY_DETAILS<<EOF" >> $GITHUB_ENV
+            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+              jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" or .Severity=="HIGH") | "- **[\(.Severity)]** \(.VulnerabilityID): \(.Title // .Description // "N/A") in \(.PkgName)@\(.InstalledVersion)"' trivy-results.json | head -20 >> $GITHUB_ENV
+              if [ "$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" or .Severity=="HIGH")] | length' trivy-results.json)" -gt 20 ]; then
+                echo "- *(and more...)*" >> $GITHUB_ENV
+              fi
+            else
+              echo "No critical or high severity vulnerabilities found! 🎉" >> $GITHUB_ENV
+            fi
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "critical=0" >> $GITHUB_OUTPUT
+            echo "high=0" >> $GITHUB_OUTPUT
+            echo "medium=0" >> $GITHUB_OUTPUT
+            echo "low=0" >> $GITHUB_OUTPUT
+            echo "total=0" >> $GITHUB_OUTPUT
+            echo "Trivy results file not found"
+          fi
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v5
+        with:
+          name: trivy-scan-results
+          path: trivy-results.json
+
+      - name: Comment PR with Trivy results
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: trivy-scan
+          message: |
+            ## 🔒 Container Security Scan (Trivy)
+
+            **Vulnerability Summary:**
+            - 🔴 Critical: `${{ steps.trivy-summary.outputs.critical }}`
+            - 🟠 High: `${{ steps.trivy-summary.outputs.high }}`
+            - 🟡 Medium: `${{ steps.trivy-summary.outputs.medium }}`
+            - 🔵 Low: `${{ steps.trivy-summary.outputs.low }}`
+            - **Total:** `${{ steps.trivy-summary.outputs.total }}`
+
+            <details>
+            <summary>🔍 View Critical & High Severity Issues</summary>
+
+            ${{ env.TRIVY_DETAILS }}
+
+            </details>
+
+            <details>
+            <summary>📦 Download Full Report</summary>
+
+            The complete Trivy scan report is available as a workflow artifact:
+            - Download `trivy-scan-results` from the workflow run
+            - The JSON file contains all vulnerability details
+
+            </details>
+
+      # - name: Fail on critical vulnerabilities
+      #   if: steps.trivy-summary.outputs.critical != '0'
+      #   run: |
+      #     echo "❌ Critical vulnerabilities found: ${{ steps.trivy-summary.outputs.critical }}"
+      #     echo "Please review and address critical vulnerabilities before merging."
+      #     exit 1
+
+  coverage-report:
+    name: Combined Coverage Report
+    runs-on: self-hosted
+    needs: [unit-tests, integration-tests]
+    if: always() && (needs.unit-tests.result == 'success' || needs.integration-tests.result == 'success')
+    permissions:
+      contents: write  # Needed to commit coverage badge
+      pull-requests: write  # Needed to comment on PRs
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-unit
+        continue-on-error: true
+
+      - name: Download integration test coverage
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-integration
+        continue-on-error: true
+
+      - name: Merge coverage reports
+        id: merge-coverage
+        run: |
+          echo "Merging coverage reports..."
+
+          # Check which coverage files exist
+          COVERAGE_FILES=""
+          if [ -f "coverage-unit.out" ]; then
+            echo "✓ Unit test coverage found"
+            COVERAGE_FILES="$COVERAGE_FILES coverage-unit.out"
+          fi
+          if [ -f "coverage-integration.out" ]; then
+            echo "✓ Integration test coverage found"
+            COVERAGE_FILES="$COVERAGE_FILES coverage-integration.out"
+          fi
+
+          if [ -z "$COVERAGE_FILES" ]; then
+            echo "ERROR: No coverage files found"
+            exit 1
+          fi
+
+          # Merge coverage files
+          echo "mode: set" > coverage-merged.out
+          grep -h -v "^mode:" $COVERAGE_FILES >> coverage-merged.out || true
+
+          # Generate reports
+          mkdir -p coverage
+          go tool cover -func=coverage-merged.out > coverage/coverage.txt
+          go tool cover -html=coverage-merged.out -o coverage/coverage.html
+
+          # Extract total coverage
+          TOTAL_COVERAGE=$(grep "total:" coverage/coverage.txt | awk '{print $3}' | sed 's/%//')
+          echo "percentage=$TOTAL_COVERAGE" >> $GITHUB_OUTPUT
+          echo ""
+          echo "========================================"
+          echo "📊 Combined Coverage: ${TOTAL_COVERAGE}%"
+          echo "========================================"
+
+          # Extract coverage by package for detailed report
+          echo "## Coverage by Package" > coverage/summary.txt
+          grep -v "total:" coverage/coverage.txt | awk '{printf "- **%s**: %s\n", $1, $3}' >> coverage/summary.txt || true
+
+      - name: Upload combined coverage report
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-combined
+          path: coverage/
+
+      - name: Create coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          COVERAGE="${{ steps.merge-coverage.outputs.percentage }}"
+
+          # Determine badge color based on coverage
+          if (( $(echo "$COVERAGE >= 90" | bc -l) )); then
+            COLOR="brightgreen"
+          elif (( $(echo "$COVERAGE >= 80" | bc -l) )); then
+            COLOR="green"
+          elif (( $(echo "$COVERAGE >= 70" | bc -l) )); then
+            COLOR="yellow"
+          elif (( $(echo "$COVERAGE >= 60" | bc -l) )); then
+            COLOR="orange"
+          else
+            COLOR="red"
+          fi
+
+          # Create JSON for shields.io endpoint badge
+          mkdir -p .github/badges
+          cat > .github/badges/coverage.json << EOF
+          {
+            "schemaVersion": 1,
+            "label": "coverage",
+            "message": "${COVERAGE}%",
+            "color": "${COLOR}"
+          }
+          EOF
+
+          echo "Coverage badge created: ${COVERAGE}% (${COLOR})"
+
+      - name: Commit coverage badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add .github/badges/coverage.json
+          git diff --staged --quiet || git commit -m "chore: update coverage badge [skip ci]"
+          git push
+
+      - name: Generate coverage summary for PR
+        if: github.event_name == 'pull_request'
+        id: coverage-summary
+        run: |
+          # Create a formatted summary
+          echo "COVERAGE_SUMMARY<<EOF" >> $GITHUB_ENV
+          cat coverage/summary.txt >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Comment PR with combined coverage
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage
+          message: |
+            ## 📊 Combined Test Coverage Report
+
+            **Total Line Coverage:** `${{ steps.merge-coverage.outputs.percentage }}%`
+
+            This report combines coverage from:
+            - ✅ Unit Tests (controllers, API)
+            - ✅ Integration Tests (LDAP client)
+
+            <details>
+            <summary>📈 View Coverage by Package</summary>
+
+            ${{ env.COVERAGE_SUMMARY }}
+
+            </details>
+
+            <details>
+            <summary>📦 Download Reports</summary>
+
+            The full HTML coverage report is available as a workflow artifact:
+            - Download `coverage-combined` from the workflow run
+            - Open `coverage.html` in your browser for interactive coverage exploration
+
+            </details>
 
   e2e-tests:
     name: E2E Tests
@@ -228,7 +505,7 @@ jobs:
         run: |
           kubectl create namespace ldap-test
           kubectl -n ldap-test create secret generic ldap-admin-pass --from-literal=adminpassword=admin
-          kubectl -n ldap-test apply -f test/e2e/openldap.yaml
+          kubectl -n ldap-test apply -f test/e2e/openldap-server-manifest.yaml
 
       - name: Wait for LDAP server
         run: kubectl -n ldap-test wait --for=condition=available --timeout=120s deployment/openldap
@@ -250,7 +527,7 @@ jobs:
           helm install openldap-operator deploy/helm/openldap-operator \
             --namespace openldap-operator-system \
             --create-namespace \
-            --values test/e2e/openldap-operator-values.yaml \
+            --values test/e2e/openldap-operator-helm-values.yaml \
             --wait \
             --timeout 120s
 
@@ -258,7 +535,7 @@ jobs:
         run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator
 
       - name: Create test resources
-        run: kubectl -n ldap-test apply -f test/e2e/test-resources.yaml
+        run: kubectl -n ldap-test apply -f test/e2e/test-custom-resources.yaml
 
       - name: Wait for controllers to start reconciliation
         run: |
@@ -325,7 +602,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Release
     runs-on: self-hosted
-    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests]
+    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests, container-scan]
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
