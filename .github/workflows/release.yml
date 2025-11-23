@@ -236,8 +236,9 @@ jobs:
       - name: Build and load operator image
         run: |
           make docker-build IMG=openldap-operator:test
-          # Load image with native snapshotter - use stdin to avoid --all-platforms issue
-          docker save openldap-operator:test | docker exec -i openldap-operator-test-control-plane ctr --namespace=k8s.io images import --snapshotter=native -
+          # Import image - containerd will automatically use the native snapshotter from config
+          # Don't specify --snapshotter flag to avoid platform unpacking issues
+          docker save openldap-operator:test | docker exec -i openldap-operator-test-control-plane ctr --namespace=k8s.io images import -
 
       - name: Install Helm
         uses: azure/setup-helm@v4
