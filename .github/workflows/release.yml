@@ -271,21 +271,12 @@ jobs:
 
             </details>
 
-            <details>
-            <summary>📦 Download Full Report</summary>
-
-            The complete Trivy scan report is available as a workflow artifact:
-            - Download `trivy-scan-results` from the workflow run
-            - The JSON file contains all vulnerability details
-
-            </details>
-
-      # - name: Fail on critical vulnerabilities
-      #   if: steps.trivy-summary.outputs.critical != '0'
-      #   run: |
-      #     echo "❌ Critical vulnerabilities found: ${{ steps.trivy-summary.outputs.critical }}"
-      #     echo "Please review and address critical vulnerabilities before merging."
-      #     exit 1
+      - name: Fail on critical vulnerabilities
+        if: steps.trivy-summary.outputs.critical != '0'
+        run: |
+          echo "❌ Critical vulnerabilities found: ${{ steps.trivy-summary.outputs.critical }}"
+          echo "Please review and address critical vulnerabilities before merging."
+          exit 1
 
   coverage-report:
     name: Combined Coverage Report
@@ -425,26 +416,6 @@ jobs:
             ## 📊 Combined Test Coverage Report
 
             **Total Line Coverage:** `${{ steps.merge-coverage.outputs.percentage }}%`
-
-            This report combines coverage from:
-            - ✅ Unit Tests (controllers, API)
-            - ✅ Integration Tests (LDAP client)
-
-            <details>
-            <summary>📈 View Coverage by Package</summary>
-
-            ${{ env.COVERAGE_SUMMARY }}
-
-            </details>
-
-            <details>
-            <summary>📦 Download Reports</summary>
-
-            The full HTML coverage report is available as a workflow artifact:
-            - Download `coverage-combined` from the workflow run
-            - Open `coverage.html` in your browser for interactive coverage exploration
-
-            </details>
 
   e2e-tests:
     name: E2E Tests
