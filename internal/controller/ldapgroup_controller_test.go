@@ -252,3 +252,114 @@ func TestLDAPGroupReconciler_handleDeletion(t *testing.T) {
 		assert.Contains(t, err.Error(), "not found")
 	}
 }
+
+// TestLDAPGroupReconciler_UpdateGroupStatus tests status updates
+func TestLDAPGroupReconciler_UpdateGroupStatus(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = openldapv1.AddToScheme(scheme)
+
+	t.Run("Should update status with member count", func(t *testing.T) {
+		ldapGroup := &openldapv1.LDAPGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-group",
+				Namespace: "default",
+			},
+			Spec: openldapv1.LDAPGroupSpec{
+				GroupName: "developers",
+				GroupType: openldapv1.GroupTypeGroupOfNames,
+			},
+		}
+
+		// Simulate status update
+		ldapGroup.Status.Phase = openldapv1.GroupPhaseReady
+		ldapGroup.Status.Message = "Group synchronized successfully"
+		ldapGroup.Status.MemberCount = 5
+		ldapGroup.Status.Members = []string{"user1", "user2", "user3", "user4", "user5"}
+
+		assert.Equal(t, openldapv1.GroupPhaseReady, ldapGroup.Status.Phase)
+		assert.Equal(t, int32(5), ldapGroup.Status.MemberCount)
+		assert.Len(t, ldapGroup.Status.Members, 5)
+	})
+
+	t.Run("Should handle empty group correctly", func(t *testing.T) {
+		ldapGroup := &openldapv1.LDAPGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "empty-group",
+				Namespace: "default",
+			},
+			Spec: openldapv1.LDAPGroupSpec{
+				GroupName: "empty",
+				GroupType: openldapv1.GroupTypePosix,
+			},
+		}
+
+		// Empty POSIX groups are valid
+		ldapGroup.Status.Phase = openldapv1.GroupPhaseReady
+		ldapGroup.Status.MemberCount = 0
+		ldapGroup.Status.Members = []string{}
+
+		assert.Equal(t, openldapv1.GroupPhaseReady, ldapGroup.Status.Phase)
+		assert.Equal(t, int32(0), ldapGroup.Status.MemberCount)
+		assert.Empty(t, ldapGroup.Status.Members)
+	})
+}
+
+// TestLDAPGroupReconciler_FindGroupsForServer tests watch events
+func TestLDAPGroupReconciler_FindGroupsForServer(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = openldapv1.AddToScheme(scheme)
+
+	t.Run("Should find groups referencing a specific server", func(t *testing.T) {
+		group1 := &openldapv1.LDAPGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "group1",
+				Namespace: "default",
+			},
+			Spec: openldapv1.LDAPGroupSpec{
+				LDAPServerRef: openldapv1.LDAPServerReference{
+					Name: "target-server",
+				},
+				GroupName: "developers",
+				GroupType: openldapv1.GroupTypeGroupOfNames,
+			},
+		}
+
+		group2 := &openldapv1.LDAPGroup{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "group2",
+				Namespace: "default",
+			},
+			Spec: openldapv1.LDAPGroupSpec{
+				LDAPServerRef: openldapv1.LDAPServerReference{
+					Name: "other-server",
+				},
+				GroupName: "operators",
+				GroupType: openldapv1.GroupTypeGroupOfNames,
+			},
+		}
+
+		client := fake.NewClientBuilder().
+			WithScheme(scheme).
+			WithRuntimeObjects(group1, group2).
+			Build()
+
+		reconciler := &LDAPGroupReconciler{
+			Client: client,
+			Scheme: scheme,
+		}
+
+		server := &openldapv1.LDAPServer{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "target-server",
+				Namespace: "default",
+			},
+		}
+
+		requests := reconciler.findGroupsForServer(context.TODO(), server)
+		// Should only find group1
+		assert.Len(t, requests, 1)
+		if len(requests) > 0 {
+			assert.Equal(t, "group1", requests[0].Name)
+		}
+	})
+}

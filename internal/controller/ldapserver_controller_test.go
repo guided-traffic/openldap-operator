@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -381,6 +383,310 @@ var _ = Describe("LDAPServer Controller", func() {
 
 			err = reconciler.SetupWithManager(mgr)
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	// Reconcile is the main controller loop that manages LDAPServer resources
+	// It handles the full lifecycle: creation, updates, deletion, and periodic health checks
+	// These tests verify the controller behavior without requiring an actual LDAP connection
+	Describe("Reconcile", func() {
+		var ldapServer *openldapv1.LDAPServer
+		var secret *corev1.Secret
+
+		BeforeEach(func() {
+			secret = &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "ldap-admin-secret",
+					Namespace: testNamespace,
+				},
+				Data: map[string][]byte{
+					"password": []byte("admin-password"),
+				},
+			}
+
+			ldapServer = &openldapv1.LDAPServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ldap-server",
+					Namespace: testNamespace,
+				},
+				Spec: openldapv1.LDAPServerSpec{
+					Host:   "ldap.example.com",
+					Port:   389,
+					BindDN: "cn=admin,dc=example,dc=com",
+					BaseDN: "dc=example,dc=com",
+					BindPasswordSecret: openldapv1.SecretReference{
+						Name: "ldap-admin-secret",
+						Key:  "password",
+					},
+					TLS: &openldapv1.TLSConfig{
+						Enabled: false,
+					},
+				},
+			}
+		})
+
+		// When a LDAPServer resource doesn't exist (e.g., already deleted), the controller
+		// should gracefully return without error. This is normal Kubernetes behavior and
+		// prevents unnecessary error logging when resources are removed.
+		It("Should handle resource not found gracefully", func() {
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      "nonexistent-server",
+					Namespace: testNamespace,
+				},
+			}
+
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+		})
+
+		// Finalizers prevent Kubernetes from deleting the resource until cleanup is complete.
+		// On first reconcile, the controller adds the finalizer to ensure any dependent
+		// resources (like LDAPUsers/Groups) can be properly notified before the server is removed.
+		// The controller requeues after adding the finalizer to continue normal reconciliation.
+		It("Should add finalizer on first reconcile", func() {
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(secret, ldapServer).
+				WithStatusSubresource(&openldapv1.LDAPServer{}).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      ldapServer.Name,
+					Namespace: ldapServer.Namespace,
+				},
+			}
+
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.Requeue).To(BeTrue())
+
+			// Verify finalizer was added
+			updatedServer := &openldapv1.LDAPServer{}
+			err = fakeClient.Get(ctx, req.NamespacedName, updatedServer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedServer.Finalizers).To(ContainElement("openldap.guided-traffic.com/finalizer"))
+		})
+
+		// After adding the finalizer, the controller performs a connection test to the LDAP server.
+		// The status is updated with the test results (ConnectionStatus, LastChecked timestamp).
+		// The controller schedules the next health check by returning RequeueAfter with the interval.
+		// This enables periodic monitoring of LDAP server availability.
+		It("Should update status with connection test results", func() {
+			// Add finalizer to skip the requeue
+			ldapServer.Finalizers = []string{"openldap.guided-traffic.com/finalizer"}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(secret, ldapServer).
+				WithStatusSubresource(&openldapv1.LDAPServer{}).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      ldapServer.Name,
+					Namespace: ldapServer.Namespace,
+				},
+			}
+
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			// Should requeue after health check interval (default 5 minutes)
+			Expect(result.RequeueAfter).ToNot(BeZero())
+
+			// Verify status was updated
+			updatedServer := &openldapv1.LDAPServer{}
+			err = fakeClient.Get(ctx, req.NamespacedName, updatedServer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedServer.Status.LastChecked).ToNot(BeNil())
+			Expect(updatedServer.Status.ConnectionStatus).ToNot(BeEmpty())
+		})
+
+		// Administrators can customize how frequently the controller checks LDAP server health
+		// via spec.healthCheckInterval. This test verifies that custom intervals are respected.
+		// For example, production servers might use longer intervals (10m) to reduce load,
+		// while development servers might use shorter intervals (1m) for quick feedback.
+		It("Should respect custom health check interval", func() {
+			// Add finalizer and custom health check interval
+			ldapServer.Finalizers = []string{"openldap.guided-traffic.com/finalizer"}
+			customInterval := metav1.Duration{Duration: 10 * time.Minute}
+			ldapServer.Spec.HealthCheckInterval = &customInterval
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(secret, ldapServer).
+				WithStatusSubresource(&openldapv1.LDAPServer{}).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      ldapServer.Name,
+					Namespace: ldapServer.Namespace,
+				},
+			}
+
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.RequeueAfter).To(Equal(10 * time.Minute))
+		})
+
+		// Kubernetes Conditions provide a standardized way to communicate resource status.
+		// The controller sets an "Available" condition based on connection test results:
+		// - Status=True, Reason=ConnectionSuccessful when LDAP is reachable
+		// - Status=False, Reason=ConnectionFailed when LDAP is unreachable
+		// These conditions are visible via 'kubectl describe' and used by monitoring tools.
+		It("Should update conditions based on connection status", func() {
+			ldapServer.Finalizers = []string{"openldap.guided-traffic.com/finalizer"}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(secret, ldapServer).
+				WithStatusSubresource(&openldapv1.LDAPServer{}).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      ldapServer.Name,
+					Namespace: ldapServer.Namespace,
+				},
+			}
+
+			_, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+
+			// Verify condition was added
+			updatedServer := &openldapv1.LDAPServer{}
+			err = fakeClient.Get(ctx, req.NamespacedName, updatedServer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedServer.Status.Conditions).ToNot(BeEmpty())
+
+			// Should have an "Available" condition
+			var availableCondition *metav1.Condition
+			for i := range updatedServer.Status.Conditions {
+				if updatedServer.Status.Conditions[i].Type == "Available" {
+					availableCondition = &updatedServer.Status.Conditions[i]
+					break
+				}
+			}
+			Expect(availableCondition).ToNot(BeNil())
+		})
+
+		// When a LDAPServer is deleted (kubectl delete), Kubernetes sets DeletionTimestamp.
+		// The controller detects this and calls handleDeletion() to perform cleanup.
+		// In this case, the LDAPServer has no external resources to clean up (it's just
+		// a reference), so the finalizer is removed immediately, allowing Kubernetes to
+		// complete the deletion. Related LDAPUsers/Groups will be notified via watch events.
+		It("Should handle deletion when DeletionTimestamp is set", func() {
+			// Set deletion timestamp and finalizer
+			now := metav1.Now()
+			ldapServer.DeletionTimestamp = &now
+			ldapServer.Finalizers = []string{"openldap.guided-traffic.com/finalizer"}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(secret, ldapServer).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      ldapServer.Name,
+					Namespace: ldapServer.Namespace,
+				},
+			}
+
+			result, err := reconciler.Reconcile(ctx, req)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Verify finalizer was removed - object should still exist but without finalizer
+			updatedServer := &openldapv1.LDAPServer{}
+			err = fakeClient.Get(ctx, req.NamespacedName, updatedServer)
+			// Object may be deleted or may exist without finalizer depending on fake client behavior
+			if err == nil {
+				// If still exists, finalizer should be removed
+				Expect(updatedServer.Finalizers).ToNot(ContainElement("openldap.guided-traffic.com/finalizer"))
+			}
+		})
+	})
+
+	// handleDeletion cleans up resources and removes finalizer when LDAPServer is deleted.
+	// For LDAPServer resources, there are no external resources to clean up since it's
+	// just a configuration reference. The finalizer is removed to allow Kubernetes to
+	// complete the deletion. Watch mechanisms ensure dependent LDAPUsers/Groups are notified.
+	Describe("handleDeletion", func() {
+		// This test verifies the core deletion logic: finalizer removal allows K8s to
+		// proceed with deleting the resource. In production, dependent resources would
+		// be reconciled via watch events when their referenced server disappears.
+		It("Should remove finalizer after cleanup", func() {
+			ldapServer := &openldapv1.LDAPServer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:       "test-server",
+					Namespace:  testNamespace,
+					Finalizers: []string{"openldap.guided-traffic.com/finalizer"},
+				},
+				Spec: openldapv1.LDAPServerSpec{
+					Host:   "ldap.example.com",
+					Port:   389,
+					BindDN: "cn=admin,dc=example,dc=com",
+					BaseDN: "dc=example,dc=com",
+					BindPasswordSecret: openldapv1.SecretReference{
+						Name: "ldap-secret",
+						Key:  "password",
+					},
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithObjects(ldapServer).
+				Build()
+
+			reconciler = &LDAPServerReconciler{
+				Client: fakeClient,
+			}
+
+			result, err := reconciler.handleDeletion(ctx, ldapServer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result).To(Equal(ctrl.Result{}))
+
+			// Verify finalizer was removed
+			updatedServer := &openldapv1.LDAPServer{}
+			err = fakeClient.Get(ctx, types.NamespacedName{
+				Name:      ldapServer.Name,
+				Namespace: ldapServer.Namespace,
+			}, updatedServer)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(updatedServer.Finalizers).ToNot(ContainElement("openldap.guided-traffic.com/finalizer"))
 		})
 	})
 })

@@ -367,6 +367,132 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 			))
 		})
 	})
+
+	// GetUserGroups retrieves all groups that a user belongs to.
+	// This function is critical for the LDAPUser controller to reconcile group memberships.
+	// It searches LDAP for all groups containing the user as a member, supporting multiple
+	// group types (posixGroup uses memberUid, groupOfNames uses member/uniqueMember).
+	// These integration tests verify the function works with a real LDAP server.
+	Describe("GetUserGroups", func() {
+		BeforeEach(func() {
+			// Setup test data: one user and two groups with the user added to both
+			userID := int32(2100)
+			groupID := int32(2100)
+
+			// Create a test user
+			userSpec := &v1.LDAPUserSpec{
+				Username:           "groupmember",
+				Email:              "groupmember@example.com",
+				FirstName:          "Group",
+				LastName:           "Member",
+				OrganizationalUnit: "users",
+				UserID:             &userID,
+				GroupID:            &groupID,
+				HomeDirectory:      "/home/groupmember",
+				LoginShell:         "/bin/bash",
+			}
+			err := client.CreateUser(userSpec)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create test groups
+			groupID1 := int32(3001)
+			group1Spec := &v1.LDAPGroupSpec{
+				GroupName:          "testgroup1",
+				OrganizationalUnit: "groups",
+				GroupID:            &groupID1,
+				GroupType:          v1.GroupTypePosix,
+			}
+			err = client.CreateGroup(group1Spec)
+			Expect(err).NotTo(HaveOccurred())
+
+			groupID2 := int32(3002)
+			group2Spec := &v1.LDAPGroupSpec{
+				GroupName:          "testgroup2",
+				OrganizationalUnit: "groups",
+				GroupID:            &groupID2,
+				GroupType:          v1.GroupTypePosix,
+			}
+			err = client.CreateGroup(group2Spec)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Add user to groups
+			err = client.AddUserToGroup("groupmember", "users", "testgroup1", "groups", v1.GroupTypePosix)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = client.AddUserToGroup("groupmember", "users", "testgroup2", "groups", v1.GroupTypePosix)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			// Cleanup
+			_ = client.DeleteUser("groupmember", "users")
+			_ = client.DeleteGroup("testgroup1", "groups")
+			_ = client.DeleteGroup("testgroup2", "groups")
+		})
+
+		// Verifies that GetUserGroups correctly identifies all groups a user belongs to.
+		// The function must search LDAP using multiple filters (member, uniqueMember, memberUid)
+		// to support different group types. Essential for displaying current memberships.
+		It("Should retrieve all groups for a user", func() {
+			groups, err := client.GetUserGroups("groupmember", "users", "groups")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(HaveLen(2))
+			Expect(groups).To(ContainElements("testgroup1", "testgroup2"))
+		})
+
+		// Edge case: users not in any groups should return empty array, not error.
+		// Important for new users before group assignments are made.
+		It("Should return empty list for user with no groups", func() {
+			// Create user not in any groups
+			userID := int32(2200)
+			groupID := int32(2200)
+			userSpec := &v1.LDAPUserSpec{
+				Username:           "nogroupuser",
+				Email:              "nogroup@example.com",
+				FirstName:          "No",
+				LastName:           "Group",
+				OrganizationalUnit: "users",
+				UserID:             &userID,
+				GroupID:            &groupID,
+				HomeDirectory:      "/home/nogroupuser",
+				LoginShell:         "/bin/bash",
+			}
+			err := client.CreateUser(userSpec)
+			Expect(err).NotTo(HaveOccurred())
+			defer client.DeleteUser("nogroupuser", "users")
+
+			groups, err := client.GetUserGroups("nogroupuser", "users", "groups")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(BeEmpty())
+		})
+
+		// Non-existent users should not cause errors - just return empty list.
+		// This allows the controller to gracefully handle race conditions where a user
+		// is queried before being fully created in LDAP.
+		It("Should handle non-existent user gracefully", func() {
+			groups, err := client.GetUserGroups("nonexistentuser", "users", "groups")
+			// Should not error, just return empty list
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(BeEmpty())
+		})
+
+		// Input validation: empty username is invalid and should return a clear error.
+		// Prevents LDAP search with malformed DN that could return incorrect results.
+		It("Should return error for empty username", func() {
+			_, err := client.GetUserGroups("", "users", "groups")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("username cannot be empty"))
+		})
+
+		// The groupOU parameter is optional - if empty, searches entire BaseDN.
+		// This flexibility allows searching across multiple OUs when needed,
+		// useful for complex LDAP hierarchies.
+		It("Should work without specifying groupOU", func() {
+			groups, err := client.GetUserGroups("groupmember", "users", "")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(groups).To(ContainElements("testgroup1", "testgroup2"))
+		})
+	})
 })
 
 // setupOrganizationalUnits creates the required organizational units
