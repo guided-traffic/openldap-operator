@@ -489,9 +489,12 @@ func TestLDAPGroup_DefaultValues(t *testing.T) {
 //
 // What: Verifies that LDAPServer can be deep-copied correctly using both DeepCopy() and DeepCopyObject().
 // Why: Kubernetes controllers frequently copy objects when processing them (e.g., before modifications).
-//      DeepCopy ensures independent copies that don't share pointers to nested structures.
+//
+//	DeepCopy ensures independent copies that don't share pointers to nested structures.
+//
 // How: Creates an LDAPServer with all fields populated, calls DeepCopy() and DeepCopyObject(),
-//      then verifies the copy has identical field values and correct type.
+//
+//	then verifies the copy has identical field values and correct type.
 func TestLDAPServer_DeepCopy(t *testing.T) {
 	original := &LDAPServer{
 		ObjectMeta: metav1.ObjectMeta{
@@ -544,9 +547,12 @@ func TestLDAPServer_DeepCopy(t *testing.T) {
 //
 // What: Verifies that LDAPUser can be deep-copied correctly with all its fields including pointers.
 // Why: LDAPUser contains pointer fields (UserID, GroupID, Enabled) and slices (Groups, SSHPublicKeys).
-//      DeepCopy must create independent copies to prevent shared references between objects.
+//
+//	DeepCopy must create independent copies to prevent shared references between objects.
+//
 // How: Creates an LDAPUser with all optional fields set, calls DeepCopy() and DeepCopyObject(),
-//      verifies field values match and pointer fields are independent copies (different addresses).
+//
+//	verifies field values match and pointer fields are independent copies (different addresses).
 func TestLDAPUser_DeepCopy(t *testing.T) {
 	userID := int32(1000)
 	groupID := int32(1000)
@@ -614,9 +620,12 @@ func TestLDAPUser_DeepCopy(t *testing.T) {
 //
 // What: Verifies that LDAPGroup can be deep-copied correctly with its pointer field (GroupID).
 // Why: LDAPGroup contains an optional pointer field (GroupID) that must be independently copied.
-//      Incorrect copying could cause unintended side effects when modifying copied objects.
+//
+//	Incorrect copying could cause unintended side effects when modifying copied objects.
+//
 // How: Creates an LDAPGroup with GroupID set, calls DeepCopy() and DeepCopyObject(),
-//      verifies field values match and GroupID pointer is a new copy (different address).
+//
+//	verifies field values match and GroupID pointer is a new copy (different address).
 func TestLDAPGroup_DeepCopy(t *testing.T) {
 	groupID := int32(5000)
 	original := &LDAPGroup{
@@ -678,9 +687,12 @@ func TestLDAPGroup_DeepCopy(t *testing.T) {
 //
 // What: Verifies that LDAPServerList can be deep-copied including all items in the Items slice.
 // Why: List types are used by Kubernetes client-go for list operations. DeepCopy must create
-//      independent copies of the entire list to prevent shared references between list items.
+//
+//	independent copies of the entire list to prevent shared references between list items.
+//
 // How: Creates a list with multiple LDAPServer items, calls DeepCopy() and DeepCopyObject(),
-//      verifies the list length and individual item names match the original.
+//
+//	verifies the list length and individual item names match the original.
 func TestLDAPServerList_DeepCopy(t *testing.T) {
 	original := &LDAPServerList{
 		Items: []LDAPServer{
@@ -717,9 +729,12 @@ func TestLDAPServerList_DeepCopy(t *testing.T) {
 //
 // What: Verifies that LDAPUserList can be deep-copied including all items with pointer fields.
 // Why: LDAPUserList contains LDAPUser items with pointer fields that must be independently copied.
-//      This ensures list operations don't create shared references between user objects.
+//
+//	This ensures list operations don't create shared references between user objects.
+//
 // How: Creates a list with multiple LDAPUser items (each with UserID/GroupID pointers),
-//      calls DeepCopy() and DeepCopyObject(), verifies list length and individual field values.
+//
+//	calls DeepCopy() and DeepCopyObject(), verifies list length and individual field values.
 func TestLDAPUserList_DeepCopy(t *testing.T) {
 	userID := int32(1000)
 	groupID := int32(1000)
@@ -758,9 +773,12 @@ func TestLDAPUserList_DeepCopy(t *testing.T) {
 //
 // What: Verifies that LDAPGroupList can be deep-copied including all group items.
 // Why: List types must support deep copying for Kubernetes client-go operations.
-//      Ensures list operations create independent copies of all group items.
+//
+//	Ensures list operations create independent copies of all group items.
+//
 // How: Creates a list with multiple LDAPGroup items, calls DeepCopy() and DeepCopyObject(),
-//      verifies the list length matches the original.
+//
+//	verifies the list length matches the original.
 func TestLDAPGroupList_DeepCopy(t *testing.T) {
 	original := &LDAPGroupList{
 		Items: []LDAPGroup{
@@ -794,7 +812,9 @@ func TestLDAPGroupList_DeepCopy(t *testing.T) {
 //
 // What: Verifies that TLSConfig embedded struct can be deep-copied correctly.
 // Why: TLSConfig is embedded in LDAPServerSpec and must be independently copyable.
-//      This ensures TLS settings aren't shared when copying LDAPServer objects.
+//
+//	This ensures TLS settings aren't shared when copying LDAPServer objects.
+//
 // How: Creates a TLSConfig with all fields set, calls DeepCopy(), verifies field values match.
 func TestTLSConfig_DeepCopy(t *testing.T) {
 	original := &TLSConfig{
@@ -818,7 +838,9 @@ func TestTLSConfig_DeepCopy(t *testing.T) {
 //
 // What: Verifies that SecretReference embedded struct can be deep-copied correctly.
 // Why: SecretReference is used in LDAPServerSpec for bind credentials and must be independently copyable.
-//      Ensures secret references aren't shared when copying LDAPServer objects.
+//
+//	Ensures secret references aren't shared when copying LDAPServer objects.
+//
 // How: Creates a SecretReference with Name/Key set, calls DeepCopy(), verifies field values match.
 func TestSecretReference_DeepCopy(t *testing.T) {
 	original := &SecretReference{
@@ -842,7 +864,9 @@ func TestSecretReference_DeepCopy(t *testing.T) {
 //
 // What: Verifies that LDAPServerReference embedded struct can be deep-copied correctly.
 // Why: LDAPServerReference is used in LDAPUser/LDAPGroup specs to reference LDAPServer objects.
-//      Must be independently copyable to prevent shared references across user/group objects.
+//
+//	Must be independently copyable to prevent shared references across user/group objects.
+//
 // How: Creates a LDAPServerReference with Name/Namespace set, calls DeepCopy(), verifies field values.
 func TestLDAPServerReference_DeepCopy(t *testing.T) {
 	original := &LDAPServerReference{

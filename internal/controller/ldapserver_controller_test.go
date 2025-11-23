@@ -473,7 +473,7 @@ var _ = Describe("LDAPServer Controller", func() {
 
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Requeue).To(BeTrue())
+			Expect(result).ToNot(Equal(ctrl.Result{}))
 
 			// Verify finalizer was added
 			updatedServer := &openldapv1.LDAPServer{}

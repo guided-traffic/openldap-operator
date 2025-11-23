@@ -520,7 +520,7 @@ var _ = Describe("LDAPUser Controller", func() {
 
 			result, err := reconciler.Reconcile(ctx, req)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(result.Requeue).To(BeTrue())
+			Expect(result).ToNot(Equal(ctrl.Result{}))
 
 			// Verify finalizer was added
 			updatedUser := &openldapv1.LDAPUser{}
