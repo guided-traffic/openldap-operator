@@ -678,7 +678,7 @@ jobs:
           token: ${{ secrets.BOT_PAT }}
 
       - name: Download coverage badge
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-badge
           path: .github/badges/
