@@ -435,15 +435,17 @@ jobs:
             echo "trend=baseline" >> $GITHUB_OUTPUT
             echo "Cannot compare - main branch coverage not available"
           else
-            DIFF=$(echo "$CURRENT - $MAIN" | bc -l)
+            # Use Python for floating point arithmetic (always available in GitHub Actions)
+            DIFF=$(python3 -c "print(round($CURRENT - $MAIN, 2))")
             echo "diff=$DIFF" >> $GITHUB_OUTPUT
 
             # Determine emoji and trend based on difference
-            if (( $(echo "$DIFF > 0" | bc -l) )); then
+            # Use Python for comparison to avoid bc dependency
+            if [ "$(python3 -c "print(1 if $DIFF > 0 else 0)")" = "1" ]; then
               echo "emoji=📈" >> $GITHUB_OUTPUT
               echo "trend=improved" >> $GITHUB_OUTPUT
               echo "Coverage improved by ${DIFF}%"
-            elif (( $(echo "$DIFF < 0" | bc -l) )); then
+            elif [ "$(python3 -c "print(1 if $DIFF < 0 else 0)")" = "1" ]; then
               echo "emoji=📉" >> $GITHUB_OUTPUT
               echo "trend=decreased" >> $GITHUB_OUTPUT
               echo "Coverage decreased by ${DIFF}%"
