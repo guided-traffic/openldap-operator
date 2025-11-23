@@ -566,7 +566,6 @@ jobs:
 
       - name: Install LDAP server in Kind
         run: |
-          kubectl create namespace ldap-test
           kubectl -n ldap-test create secret generic ldap-admin-pass --from-literal=adminpassword=admin
           kubectl -n ldap-test apply -f test/e2e/openldap-server-manifest.yaml
 
