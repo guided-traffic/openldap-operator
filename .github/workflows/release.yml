@@ -398,6 +398,58 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: update coverage badge [skip ci]"
           git push
 
+      - name: Get main branch coverage
+        if: github.event_name == 'pull_request'
+        id: main-coverage
+        continue-on-error: true
+        run: |
+          # Try to fetch coverage from main branch badge
+          MAIN_COVERAGE="N/A"
+          MAIN_BADGE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/.github/badges/coverage.json"
+
+          echo "Fetching main branch coverage from: $MAIN_BADGE_URL"
+
+          if curl -f -s "$MAIN_BADGE_URL" -o main-coverage.json; then
+            MAIN_COVERAGE=$(jq -r '.message' main-coverage.json | sed 's/%//')
+            echo "Main branch coverage: ${MAIN_COVERAGE}%"
+          else
+            echo "Could not fetch main branch coverage badge"
+          fi
+
+          echo "percentage=$MAIN_COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Calculate coverage difference
+        if: github.event_name == 'pull_request'
+        id: coverage-diff
+        run: |
+          CURRENT="${{ steps.merge-coverage.outputs.percentage }}"
+          MAIN="${{ steps.main-coverage.outputs.percentage }}"
+
+          if [ "$MAIN" = "N/A" ]; then
+            echo "diff=N/A" >> $GITHUB_OUTPUT
+            echo "emoji=ℹ️" >> $GITHUB_OUTPUT
+            echo "trend=baseline" >> $GITHUB_OUTPUT
+            echo "Cannot compare - main branch coverage not available"
+          else
+            DIFF=$(echo "$CURRENT - $MAIN" | bc -l)
+            echo "diff=$DIFF" >> $GITHUB_OUTPUT
+
+            # Determine emoji and trend based on difference
+            if (( $(echo "$DIFF > 0" | bc -l) )); then
+              echo "emoji=📈" >> $GITHUB_OUTPUT
+              echo "trend=improved" >> $GITHUB_OUTPUT
+              echo "Coverage improved by ${DIFF}%"
+            elif (( $(echo "$DIFF < 0" | bc -l) )); then
+              echo "emoji=📉" >> $GITHUB_OUTPUT
+              echo "trend=decreased" >> $GITHUB_OUTPUT
+              echo "Coverage decreased by ${DIFF}%"
+            else
+              echo "emoji=➡️" >> $GITHUB_OUTPUT
+              echo "trend=unchanged" >> $GITHUB_OUTPUT
+              echo "Coverage unchanged"
+            fi
+          fi
+
       - name: Generate coverage summary for PR
         if: github.event_name == 'pull_request'
         id: coverage-summary
@@ -415,7 +467,9 @@ jobs:
           message: |
             ## 📊 Combined Test Coverage Report
 
-            **Total Line Coverage:** `${{ steps.merge-coverage.outputs.percentage }}%`
+            **Current Coverage:** `${{ steps.merge-coverage.outputs.percentage }}%`
+            **Main Branch Coverage:** `${{ steps.main-coverage.outputs.percentage }}%`
+            **Difference:** ${{ steps.coverage-diff.outputs.emoji }} `${{ steps.coverage-diff.outputs.diff }}%`
 
   e2e-tests:
     name: E2E Tests
