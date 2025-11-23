@@ -25,6 +25,8 @@ spec:
       labels:
         app: openldap
     spec:
+      imagePullSecrets:
+      - name: dockerhub-credentials
       containers:
       - name: openldap
         image: osixia/openldap:1.5.0
