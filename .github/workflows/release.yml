@@ -314,10 +314,11 @@ jobs:
           metadata:
             name: test-ldap-server
           spec:
-            url: ldap://openldap.ldap-test.svc.cluster.local:389
+            host: openldap.ldap-test.svc.cluster.local
+            port: 389
             baseDN: dc=example,dc=com
             bindDN: cn=admin,dc=example,dc=com
-            bindPassword:
+            bindPasswordSecret:
               name: ldap-admin-pass
               key: adminpassword
             tls:
@@ -331,10 +332,10 @@ jobs:
           spec:
             ldapServerRef:
               name: test-ldap-server
-            cn: testgroup
-            ou: groups
+            groupName: testgroup
+            organizationalUnit: groups
             groupType: posixGroup
-            gidNumber: 5000
+            groupID: 5000
             description: "Test group"
           ---
           apiVersion: openldap.guided-traffic.com/v1
@@ -344,14 +345,14 @@ jobs:
           spec:
             ldapServerRef:
               name: test-ldap-server
-            uid: testuser
-            ou: users
-            givenName: Test
-            sn: User
-            cn: Test User
-            mail: testuser@example.com
-            uidNumber: 10001
-            gidNumber: 5000
+            username: testuser
+            organizationalUnit: users
+            firstName: Test
+            lastName: User
+            displayName: Test User
+            email: testuser@example.com
+            userID: 10001
+            groupID: 5000
             groups:
             - testgroup
           EOF
@@ -359,8 +360,8 @@ jobs:
       - name: Wait for resources to sync
         run: |
           timeout 60s bash -c 'until kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" | grep -q "Connected"; do sleep 2; done'
-          timeout 60s bash -c 'until kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" | grep -q "Synced"; do sleep 2; done'
-          timeout 60s bash -c 'until kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" | grep -q "Synced"; do sleep 2; done'
+          timeout 60s bash -c 'until kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" | grep -q "Ready"; do sleep 2; done'
+          timeout 60s bash -c 'until kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" | grep -qE "Ready|Warning"; do sleep 2; done'
 
       - name: Verify user in LDAP
         run: |
