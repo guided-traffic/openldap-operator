@@ -244,9 +244,67 @@ func (r *LDAPUserReconciler) reconcileUser(ctx context.Context, conn *ldap.Conn,
 		// Update existing user
 		return r.updateLDAPUser(conn, userDN, ldapUser)
 	} else {
+		// Ensure OU exists before creating user
+		ou := ldapUser.Spec.OrganizationalUnit
+		if ou == "" {
+			ou = "users"
+		}
+		ouDN := fmt.Sprintf("ou=%s,%s", ou, ldapServer.Spec.BaseDN)
+		err = r.ensureOUExists(ctx, conn, ouDN, ou)
+		if err != nil {
+			logger := log.FromContext(ctx)
+			logger.Error(err, "Failed to ensure OU exists", "ou", ouDN)
+			return fmt.Errorf("failed to ensure OU exists: %w", err)
+		}
 		// Create new user
 		return r.createLDAPUser(ctx, conn, userDN, ldapServer, ldapUser)
 	}
+}
+
+// ensureOUExists checks if an OU exists and creates it if it doesn't
+func (r *LDAPUserReconciler) ensureOUExists(ctx context.Context, conn *ldap.Conn, ouDN string, ouName string) error {
+	logger := log.FromContext(ctx)
+
+	// Check if OU exists
+	searchRequest := ldap.NewSearchRequest(
+		ouDN,
+		ldap.ScopeBaseObject,
+		ldap.NeverDerefAliases,
+		1,
+		30,
+		false,
+		"(objectClass=organizationalUnit)",
+		[]string{"ou"},
+		nil,
+	)
+
+	_, err := conn.Search(searchRequest)
+	if err == nil {
+		// OU exists
+		logger.Info("OU already exists", "dn", ouDN)
+		return nil
+	}
+
+	// Check if error is "No Such Object" - means OU doesn't exist
+	if ldapErr, ok := err.(*ldap.Error); ok && ldapErr.ResultCode == ldap.LDAPResultNoSuchObject {
+		// Create the OU
+		logger.Info("Creating OU", "dn", ouDN, "ou", ouName)
+		addRequest := ldap.NewAddRequest(ouDN, nil)
+		addRequest.Attribute("objectClass", []string{"organizationalUnit"})
+		addRequest.Attribute("ou", []string{ouName})
+
+		err = conn.Add(addRequest)
+		if err != nil {
+			logger.Error(err, "Failed to create OU", "dn", ouDN)
+			return fmt.Errorf("failed to create OU %s: %w", ouDN, err)
+		}
+
+		logger.Info("Successfully created OU", "dn", ouDN)
+		return nil
+	}
+
+	// Some other error occurred
+	return fmt.Errorf("failed to check if OU exists: %w", err)
 }
 
 // createLDAPUser creates a new user in LDAP

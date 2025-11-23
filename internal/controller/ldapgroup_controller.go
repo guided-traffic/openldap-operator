@@ -240,6 +240,13 @@ func (r *LDAPGroupReconciler) reconcileGroup(ctx context.Context, conn *ldap.Con
 		}
 	} else {
 		logger.Info("Group does not exist, creating")
+		// Ensure OU exists before creating group
+		ouDN := fmt.Sprintf("ou=%s,%s", ou, ldapServer.Spec.BaseDN)
+		err = r.ensureOUExists(ctx, conn, ouDN, ou)
+		if err != nil {
+			logger.Error(err, "Failed to ensure OU exists", "ou", ouDN)
+			return fmt.Errorf("failed to ensure OU exists: %w", err)
+		}
 		// Create new group
 		err = r.createLDAPGroup(ctx, conn, groupDN, ldapServer, ldapGroup)
 		if err != nil {
@@ -249,6 +256,52 @@ func (r *LDAPGroupReconciler) reconcileGroup(ctx context.Context, conn *ldap.Con
 
 	// Update status with current member information
 	return r.updateGroupStatus(ctx, conn, groupDN, ldapGroup)
+}
+
+// ensureOUExists checks if an OU exists and creates it if it doesn't
+func (r *LDAPGroupReconciler) ensureOUExists(ctx context.Context, conn *ldap.Conn, ouDN string, ouName string) error {
+	logger := log.FromContext(ctx)
+
+	// Check if OU exists
+	searchRequest := ldap.NewSearchRequest(
+		ouDN,
+		ldap.ScopeBaseObject,
+		ldap.NeverDerefAliases,
+		1,
+		30,
+		false,
+		"(objectClass=organizationalUnit)",
+		[]string{"ou"},
+		nil,
+	)
+
+	_, err := conn.Search(searchRequest)
+	if err == nil {
+		// OU exists
+		logger.Info("OU already exists", "dn", ouDN)
+		return nil
+	}
+
+	// Check if error is "No Such Object" - means OU doesn't exist
+	if ldapErr, ok := err.(*ldap.Error); ok && ldapErr.ResultCode == ldap.LDAPResultNoSuchObject {
+		// Create the OU
+		logger.Info("Creating OU", "dn", ouDN, "ou", ouName)
+		addRequest := ldap.NewAddRequest(ouDN, nil)
+		addRequest.Attribute("objectClass", []string{"organizationalUnit"})
+		addRequest.Attribute("ou", []string{ouName})
+
+		err = conn.Add(addRequest)
+		if err != nil {
+			logger.Error(err, "Failed to create OU", "dn", ouDN)
+			return fmt.Errorf("failed to create OU %s: %w", ouDN, err)
+		}
+
+		logger.Info("Successfully created OU", "dn", ouDN)
+		return nil
+	}
+
+	// Some other error occurred
+	return fmt.Errorf("failed to check if OU exists: %w", err)
 }
 
 // createLDAPGroup creates a new group in LDAP
