@@ -7,7 +7,7 @@ COVERAGE_DIR=coverage
 HELM_CHART_DIR=deploy/helm/openldap-operator
 
 # Image URL to use all building/pushing image targets
-IMG ?= docker.io/hansfischer/openldap-operator:latest
+IMG ?= docker.io/guidedtraffic/openldap-operator:latest
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary
 ENVTEST_K8S_VERSION = 1.35.0
