@@ -168,6 +168,125 @@ jobs:
           name: coverage-integration
           path: coverage-integration.out
 
+  container-scan:
+    name: Container Security Scan
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Build container image
+        run: make docker-build IMG=openldap-operator:scan
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: 'openldap-operator:scan'
+          format: 'json'
+          output: 'trivy-results.json'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+
+      - name: Generate Trivy summary
+        id: trivy-summary
+        run: |
+          # Parse Trivy results and create a summary
+          if [ -f trivy-results.json ]; then
+            # Count vulnerabilities by severity
+            CRITICAL=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL")] | length' trivy-results.json)
+            HIGH=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="HIGH")] | length' trivy-results.json)
+            MEDIUM=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="MEDIUM")] | length' trivy-results.json)
+            LOW=$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="LOW")] | length' trivy-results.json)
+            TOTAL=$((CRITICAL + HIGH + MEDIUM + LOW))
+
+            echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+            echo "high=$HIGH" >> $GITHUB_OUTPUT
+            echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+            echo "low=$LOW" >> $GITHUB_OUTPUT
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+
+            echo "Trivy scan completed: $TOTAL vulnerabilities found"
+            echo "- Critical: $CRITICAL"
+            echo "- High: $HIGH"
+            echo "- Medium: $MEDIUM"
+            echo "- Low: $LOW"
+
+            # Generate detailed report for PR comment
+            echo "TRIVY_DETAILS<<EOF" >> $GITHUB_ENV
+            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+              jq -r '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" or .Severity=="HIGH") | "- **[\(.Severity)]** \(.VulnerabilityID): \(.Title // .Description // "N/A") in \(.PkgName)@\(.InstalledVersion)"' trivy-results.json | head -20 >> $GITHUB_ENV
+              if [ "$(jq '[.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL" or .Severity=="HIGH")] | length' trivy-results.json)" -gt 20 ]; then
+                echo "- *(and more...)*" >> $GITHUB_ENV
+              fi
+            else
+              echo "No critical or high severity vulnerabilities found! 🎉" >> $GITHUB_ENV
+            fi
+            echo "EOF" >> $GITHUB_ENV
+          else
+            echo "critical=0" >> $GITHUB_OUTPUT
+            echo "high=0" >> $GITHUB_OUTPUT
+            echo "medium=0" >> $GITHUB_OUTPUT
+            echo "low=0" >> $GITHUB_OUTPUT
+            echo "total=0" >> $GITHUB_OUTPUT
+            echo "Trivy results file not found"
+          fi
+
+      - name: Upload Trivy results
+        uses: actions/upload-artifact@v5
+        with:
+          name: trivy-scan-results
+          path: trivy-results.json
+
+      - name: Comment PR with Trivy results
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: trivy-scan
+          message: |
+            ## 🔒 Container Security Scan (Trivy)
+
+            **Vulnerability Summary:**
+            - 🔴 Critical: `${{ steps.trivy-summary.outputs.critical }}`
+            - 🟠 High: `${{ steps.trivy-summary.outputs.high }}`
+            - 🟡 Medium: `${{ steps.trivy-summary.outputs.medium }}`
+            - 🔵 Low: `${{ steps.trivy-summary.outputs.low }}`
+            - **Total:** `${{ steps.trivy-summary.outputs.total }}`
+
+            <details>
+            <summary>🔍 View Critical & High Severity Issues</summary>
+
+            ${{ env.TRIVY_DETAILS }}
+
+            </details>
+
+            <details>
+            <summary>📦 Download Full Report</summary>
+
+            The complete Trivy scan report is available as a workflow artifact:
+            - Download `trivy-scan-results` from the workflow run
+            - The JSON file contains all vulnerability details
+
+            </details>
+
+      # - name: Fail on critical vulnerabilities
+      #   if: steps.trivy-summary.outputs.critical != '0'
+      #   run: |
+      #     echo "❌ Critical vulnerabilities found: ${{ steps.trivy-summary.outputs.critical }}"
+      #     echo "Please review and address critical vulnerabilities before merging."
+      #     exit 1
+
   coverage-report:
     name: Combined Coverage Report
     runs-on: self-hosted
@@ -483,7 +602,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Release
     runs-on: self-hosted
-    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests]
+    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests, container-scan]
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
