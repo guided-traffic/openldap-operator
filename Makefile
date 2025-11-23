@@ -38,13 +38,13 @@ SHELL = /usr/bin/env bash -o pipefail
 all: build
 
 # Build the operator binary
-build: manifests generate fmt vet
+build:
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GOBUILD) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/main.go
 
 # Run the operator from your host
-run: manifests generate fmt vet
+run:
 	@echo "Running $(BINARY_NAME)..."
 	$(GOCMD) run ./cmd/main.go
 
@@ -54,29 +54,31 @@ deps:
 	$(GOMOD) download
 	$(GOMOD) tidy
 
-# Run all tests
-test: fmt vet
-	@echo "Running all tests..."
-	$(GOTEST) -v ./...
+# Run all tests (excluding integration tests that require Docker)
+test:
+	@echo "Running all unit tests..."
+	$(GOTEST) -v ./api/... ./internal/controller/...
 
 # Run unit tests only
-test-unit: fmt vet
+test-unit:
 	@echo "Running unit tests..."
 	@$(GOTEST) ./api/... ./internal/controller/... -coverprofile=coverage.out -v 2>&1 | grep -v "does not match go tool version"
 	@echo ""
 	@echo "Coverage Summary:"
 	@$(GOCMD) tool cover -func=coverage.out | tail -1 || echo "No coverage data"
 
-# Run integration tests only
+# Run integration tests only (requires Docker)
 test-integration:
 	@echo "Running integration tests with Docker..."
-	./test/run-tests.sh
+	./test/run-tests.sh --skip-unit
 
 # Run all tests (unit + integration)
-test-all: test test-integration
+test-all:
+	@echo "Running all tests (unit + integration)..."
+	./test/run-tests.sh
 
 # Generate test coverage
-coverage: fmt vet
+coverage:
 	@echo "Generating coverage report..."
 	@mkdir -p $(COVERAGE_DIR)
 	$(GOTEST) -coverprofile=$(COVERAGE_DIR)/coverage.out ./...
@@ -164,13 +166,13 @@ clean:
 	rm -f gosec-report.json
 
 # Build docker image
-docker-build: test
+docker-build:
 	@echo "Building Docker image..."
-	docker build -t ${IMG} .
+	docker build -f Containerfile -t ${IMG} .
 
 # Build and push docker image for cross-platform support
 PLATFORMS ?= linux/arm64,linux/amd64
-docker-buildx: test
+docker-buildx:
 	@echo "Building multi-platform Docker image..."
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Containerfile > Containerfile.cross
 	- docker buildx create --name project-v3-builder

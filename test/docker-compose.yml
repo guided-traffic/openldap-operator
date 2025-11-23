@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap-operator-test
+    hostname: ldap.example.com
+    ports:
+      - "1389:389"
+      - "1636:636"
+    environment:
+      # Basic configuration
+      LDAP_ORGANISATION: "Example Inc"
+      LDAP_DOMAIN: "example.com"
+      LDAP_BASE_DN: "dc=example,dc=com"
+
+      # Admin credentials
+      LDAP_ADMIN_PASSWORD: "admin123"
+      LDAP_CONFIG_PASSWORD: "config123"
+
+      # User management
+      LDAP_READONLY_USER: "false"
+      LDAP_RFC2307BIS_SCHEMA: "false"
+
+      # Backend
+      LDAP_BACKEND: "mdb"
+
+      # TLS configuration
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: "ldap.crt"
+      LDAP_TLS_KEY_FILENAME: "ldap.key"
+      LDAP_TLS_DH_PARAM_FILENAME: "dhparam.pem"
+      LDAP_TLS_CA_CRT_FILENAME: "ca.crt"
+      LDAP_TLS_ENFORCE: "false"
+      LDAP_TLS_CIPHER_SUITE: "SECURE256:-VERS-SSL3.0"
+      LDAP_TLS_VERIFY_CLIENT: "never"
+
+      # Replication
+      LDAP_REPLICATION: "false"
+
+      # Logging
+      LDAP_LOG_LEVEL: "256"
+
+    volumes:
+      # Mount init LDIF if exists
+      - ./ldap-config:/ldifs:ro
+
+    healthcheck:
+      test: ["CMD", "ldapsearch", "-x", "-H", "ldap://localhost:389", "-b", "dc=example,dc=com", "-D", "cn=admin,dc=example,dc=com", "-w", "admin123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+    networks:
+      - openldap-test
+
+networks:
+  openldap-test:
+    driver: bridge

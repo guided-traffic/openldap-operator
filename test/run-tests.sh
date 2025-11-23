@@ -24,7 +24,8 @@ SKIP_INTEGRATION=false
 VERBOSE=false
 COVERAGE=false
 LDAP_HOST="localhost"
-LDAP_PORT="389"
+LDAP_PORT="1389"  # External port mapped from Docker container
+DOCKER_COMPOSE_CMD="docker-compose"  # Default, will be detected in check_prerequisites
 
 # Function to print colored output
 print_status() {
@@ -135,10 +136,16 @@ check_prerequisites() {
             exit 1
         fi
 
-        if ! command_exists docker-compose; then
-            print_error "Docker Compose is not installed"
+        # Check for Docker Compose V2 (docker compose) or V1 (docker-compose)
+        if docker compose version >/dev/null 2>&1; then
+            DOCKER_COMPOSE_CMD="docker compose"
+        elif command_exists docker-compose; then
+            DOCKER_COMPOSE_CMD="docker-compose"
+        else
+            print_error "Docker Compose is not installed (tried 'docker compose' and 'docker-compose')"
             exit 1
         fi
+        print_status "Using Docker Compose: $DOCKER_COMPOSE_CMD"
     fi
 
     print_status "Prerequisites check passed"
@@ -153,14 +160,15 @@ setup_docker() {
 
     print_status "Setting up Docker environment..."
 
+
     cd "$TEST_DIR"
 
     # Stop any existing containers
-    docker-compose -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
+    $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
 
     # Start the services
     print_status "Starting OpenLDAP server..."
-    docker-compose -f "$DOCKER_COMPOSE_FILE" up -d openldap
+    $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" up -d openldap
 
     # Wait for LDAP server to be ready
     print_status "Waiting for LDAP server to be ready..."
@@ -168,14 +176,15 @@ setup_docker() {
     local attempt=1
 
     while [[ $attempt -le $max_attempts ]]; do
-        if docker-compose -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapsearch -x -H ldap://localhost:1389 -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w "admin123" >/dev/null 2>&1; then
+        # Check from inside the container using internal port 389
+        if $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapsearch -x -H ldap://localhost:389 -b "dc=example,dc=com" -D "cn=admin,dc=example,dc=com" -w "admin123" >/dev/null 2>&1; then
             print_status "LDAP server is ready"
             break
         fi
 
         if [[ $attempt -eq $max_attempts ]]; then
             print_error "LDAP server failed to start within timeout"
-            docker-compose -f "$DOCKER_COMPOSE_FILE" logs openldap
+            $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" logs openldap
             exit 1
         fi
 
@@ -187,7 +196,7 @@ setup_docker() {
     # Initialize test data
     print_status "Initializing test data..."
     if [[ -f "${TEST_DIR}/ldap-config/init.ldif" ]]; then
-        docker-compose -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapadd -x -H ldap://localhost:1389 -D "cn=admin,dc=example,dc=com" -w "admin123" -f /ldifs/init.ldif 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" exec -T openldap ldapadd -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w "admin123" -f /ldifs/init.ldif 2>/dev/null || true
     fi
 }
 
@@ -211,16 +220,13 @@ run_unit_tests() {
         print_status "Testing API types with coverage..."
         go test -v ./api/v1/... -coverprofile coverage/api.out -covermode=atomic
 
-        print_status "Testing LDAP client with coverage..."
-        go test -v ./internal/ldap/... -coverprofile coverage/ldap.out -covermode=atomic
-
         print_status "Testing controllers with coverage..."
         go test -v ./internal/controller/... -coverprofile coverage/controller.out -covermode=atomic
 
         # Combine coverage files
         print_status "Combining coverage reports..."
         echo "mode: atomic" > coverage/unit.out
-        grep -h -v "^mode:" coverage/api.out coverage/ldap.out coverage/controller.out >> coverage/unit.out 2>/dev/null || true
+        grep -h -v "^mode:" coverage/api.out coverage/controller.out >> coverage/unit.out 2>/dev/null || true
 
         # Generate HTML and text reports
         go tool cover -html=coverage/unit.out -o coverage/unit-coverage.html
@@ -236,9 +242,6 @@ run_unit_tests() {
     else
         # Run unit tests for API types
         go test -v ./api/v1/... -cover
-
-        # Run unit tests for LDAP client
-        go test -v ./internal/ldap/... -cover
 
         # Run unit tests for controllers
         go test -v ./internal/controller/... -cover
@@ -272,17 +275,23 @@ run_integration_tests() {
         print_status "  Base DN: $LDAP_BASE_DN"
     fi
 
-    # Run the integration test binary
-    if [[ -f "${TEST_DIR}/integration/runner/main.go" ]]; then
-        cd "${TEST_DIR}/integration/runner"
-        go run main.go \
-            --ldap-host "$LDAP_HOST" \
-            --ldap-port "$LDAP_PORT" \
-            --ldap-bind-dn "$LDAP_BIND_DN" \
-            --ldap-base-dn "$LDAP_BASE_DN" \
-            --ldap-password "$LDAP_PASSWORD"
+    # Run integration tests from internal/ldap that use Docker
+    print_status "Running LDAP client integration tests..."
+    if [[ "$COVERAGE" == "true" ]]; then
+        mkdir -p coverage
+        go test -v ./internal/ldap/... -coverprofile coverage/integration-ldap.out -covermode=atomic -cover
+
+        # Generate integration test coverage report
+        go tool cover -html=coverage/integration-ldap.out -o coverage/integration-ldap-coverage.html
+        go tool cover -func=coverage/integration-ldap.out | tee coverage/integration-ldap-coverage.txt
+
+        print_status "Integration test coverage report generated: coverage/integration-ldap-coverage.html"
+        echo ""
+        print_status "Integration Test Coverage Summary:"
+        tail -1 coverage/integration-ldap-coverage.txt
+        echo ""
     else
-        print_warning "Integration test binary not found, skipping"
+        go test -v ./internal/ldap/... -cover
     fi
 
     print_status "Integration tests completed"
@@ -293,7 +302,7 @@ cleanup() {
     if [[ "$SKIP_DOCKER" == "false" ]]; then
         print_status "Cleaning up Docker environment..."
         cd "$TEST_DIR"
-        docker-compose -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
+        $DOCKER_COMPOSE_CMD -f "$DOCKER_COMPOSE_FILE" down --volumes --remove-orphans 2>/dev/null || true
     fi
 }
 
@@ -331,6 +340,20 @@ EOF
             cat coverage/unit-coverage.txt >> coverage/reports/summary.txt
         fi
 
+        # Add integration test coverage summary
+        if [[ -f "coverage/integration-ldap-coverage.txt" ]]; then
+            cat >> coverage/reports/summary.txt << EOF
+
+=== Integration Test Coverage Summary ===
+
+EOF
+            echo "Overall Integration Test Coverage:" >> coverage/reports/summary.txt
+            tail -1 coverage/integration-ldap-coverage.txt >> coverage/reports/summary.txt
+            echo "" >> coverage/reports/summary.txt
+            echo "Package-by-Package Coverage:" >> coverage/reports/summary.txt
+            cat coverage/integration-ldap-coverage.txt >> coverage/reports/summary.txt
+        fi
+
         cat >> coverage/reports/summary.txt << EOF
 
 === Coverage Thresholds ===
@@ -338,16 +361,22 @@ EOF
 Recommended coverage targets:
 - Overall: >= 80%
 - API types: >= 90% (validation logic is critical)
-- LDAP client: >= 85% (core functionality)
+- LDAP client: >= 85% (core functionality, integration tests)
 - Controllers: >= 75% (complex reconciliation logic)
 
 === Coverage Files ===
 
+Unit Tests:
 - HTML Report: coverage/unit-coverage.html
 - Text Report: coverage/unit-coverage.txt
 - Raw Data: coverage/unit.out
 
-Open coverage/unit-coverage.html in your browser for detailed analysis.
+Integration Tests:
+- HTML Report: coverage/integration-ldap-coverage.html
+- Text Report: coverage/integration-ldap-coverage.txt
+- Raw Data: coverage/integration-ldap.out
+
+Open the HTML reports in your browser for detailed analysis.
 
 EOF
 
@@ -357,9 +386,13 @@ EOF
         if [[ -f "coverage/unit-coverage.txt" ]]; then
             echo "Unit Test Coverage: $(tail -1 coverage/unit-coverage.txt | awk '{print $3}')"
         fi
+        if [[ -f "coverage/integration-ldap-coverage.txt" ]]; then
+            echo "Integration Test Coverage: $(tail -1 coverage/integration-ldap-coverage.txt | awk '{print $3}')"
+        fi
         echo ""
         print_status "Detailed reports available:"
-        print_status "  - HTML: coverage/unit-coverage.html"
+        print_status "  - Unit Tests HTML: coverage/unit-coverage.html"
+        print_status "  - Integration Tests HTML: coverage/integration-ldap-coverage.html"
         print_status "  - Summary: coverage/reports/summary.txt"
         echo ""
 

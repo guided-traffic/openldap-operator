@@ -1,0 +1,46 @@
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPServer
+metadata:
+  name: test-ldap-server
+spec:
+  host: openldap.ldap-test.svc.cluster.local
+  port: 389
+  baseDN: dc=example,dc=com
+  bindDN: cn=admin,dc=example,dc=com
+  bindPasswordSecret:
+    name: ldap-admin-pass
+    key: adminpassword
+  tls:
+    enabled: false
+  healthCheckInterval: 30s
+---
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPGroup
+metadata:
+  name: test-group
+spec:
+  ldapServerRef:
+    name: test-ldap-server
+  groupName: testgroup
+  organizationalUnit: groups
+  groupType: posixGroup
+  groupID: 5000
+  description: "Test group"
+---
+apiVersion: openldap.guided-traffic.com/v1
+kind: LDAPUser
+metadata:
+  name: test-user
+spec:
+  ldapServerRef:
+    name: test-ldap-server
+  username: testuser
+  organizationalUnit: users
+  firstName: Test
+  lastName: User
+  displayName: Test User
+  email: testuser@example.com
+  userID: 10001
+  groupID: 5000
+  groups:
+  - testgroup

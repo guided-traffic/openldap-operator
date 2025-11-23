@@ -29,10 +29,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 	ldapClient "github.com/guided-traffic/openldap-operator/internal/ldap"
@@ -241,9 +244,67 @@ func (r *LDAPUserReconciler) reconcileUser(ctx context.Context, conn *ldap.Conn,
 		// Update existing user
 		return r.updateLDAPUser(conn, userDN, ldapUser)
 	} else {
+		// Ensure OU exists before creating user
+		ou := ldapUser.Spec.OrganizationalUnit
+		if ou == "" {
+			ou = "users"
+		}
+		ouDN := fmt.Sprintf("ou=%s,%s", ou, ldapServer.Spec.BaseDN)
+		err = r.ensureOUExists(ctx, conn, ouDN, ou)
+		if err != nil {
+			logger := log.FromContext(ctx)
+			logger.Error(err, "Failed to ensure OU exists", "ou", ouDN)
+			return fmt.Errorf("failed to ensure OU exists: %w", err)
+		}
 		// Create new user
 		return r.createLDAPUser(ctx, conn, userDN, ldapServer, ldapUser)
 	}
+}
+
+// ensureOUExists checks if an OU exists and creates it if it doesn't
+func (r *LDAPUserReconciler) ensureOUExists(ctx context.Context, conn *ldap.Conn, ouDN string, ouName string) error {
+	logger := log.FromContext(ctx)
+
+	// Check if OU exists
+	searchRequest := ldap.NewSearchRequest(
+		ouDN,
+		ldap.ScopeBaseObject,
+		ldap.NeverDerefAliases,
+		1,
+		30,
+		false,
+		"(objectClass=organizationalUnit)",
+		[]string{"ou"},
+		nil,
+	)
+
+	_, err := conn.Search(searchRequest)
+	if err == nil {
+		// OU exists
+		logger.Info("OU already exists", "dn", ouDN)
+		return nil
+	}
+
+	// Check if error is "No Such Object" - means OU doesn't exist
+	if ldapErr, ok := err.(*ldap.Error); ok && ldapErr.ResultCode == ldap.LDAPResultNoSuchObject {
+		// Create the OU
+		logger.Info("Creating OU", "dn", ouDN, "ou", ouName)
+		addRequest := ldap.NewAddRequest(ouDN, nil)
+		addRequest.Attribute("objectClass", []string{"organizationalUnit"})
+		addRequest.Attribute("ou", []string{ouName})
+
+		err = conn.Add(addRequest)
+		if err != nil {
+			logger.Error(err, "Failed to create OU", "dn", ouDN)
+			return fmt.Errorf("failed to create OU %s: %w", ouDN, err)
+		}
+
+		logger.Info("Successfully created OU", "dn", ouDN)
+		return nil
+	}
+
+	// Some other error occurred
+	return fmt.Errorf("failed to check if OU exists: %w", err)
 }
 
 // createLDAPUser creates a new user in LDAP
@@ -526,7 +587,26 @@ func (r *LDAPUserReconciler) updateStatus(ctx context.Context, ldapUser *openlda
 		ldapUser.Status.Conditions = append(ldapUser.Status.Conditions, condition)
 	}
 
-	if err := r.Status().Update(ctx, ldapUser); err != nil {
+	// Retry status update on conflict
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest version of the resource
+		latest := &openldapv1.LDAPUser{}
+		if err := r.Get(ctx, types.NamespacedName{Name: ldapUser.Name, Namespace: ldapUser.Namespace}, latest); err != nil {
+			return err
+		}
+
+		// Update status fields on latest version
+		latest.Status.Phase = phase
+		latest.Status.Message = message
+		latest.Status.ObservedGeneration = ldapUser.Generation
+		latest.Status.Conditions = ldapUser.Status.Conditions
+		latest.Status.ActualHomeDirectory = ldapUser.Status.ActualHomeDirectory
+		latest.Status.MissingGroups = ldapUser.Status.MissingGroups
+
+		return r.Status().Update(ctx, latest)
+	})
+
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -599,5 +679,49 @@ func (r *LDAPUserReconciler) handleDeletion(ctx context.Context, ldapUser *openl
 func (r *LDAPUserReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openldapv1.LDAPUser{}).
+		Watches(
+			&openldapv1.LDAPServer{},
+			handler.EnqueueRequestsFromMapFunc(r.findUsersForServer),
+		).
 		Complete(r)
+}
+
+// findUsersForServer finds all LDAPUsers that reference a given LDAPServer
+func (r *LDAPUserReconciler) findUsersForServer(ctx context.Context, server client.Object) []reconcile.Request {
+	ldapServer, ok := server.(*openldapv1.LDAPServer)
+	if !ok {
+		return nil
+	}
+
+	// List all LDAPUsers
+	userList := &openldapv1.LDAPUserList{}
+	if err := r.List(ctx, userList); err != nil {
+		return nil
+	}
+
+	// Find users that reference this server
+	var requests []reconcile.Request
+	for _, user := range userList.Items {
+		// Check if this user references the server
+		if user.Spec.LDAPServerRef.Name == ldapServer.Name {
+			// Check if they're in the same namespace or if namespace is not specified
+			if user.Spec.LDAPServerRef.Namespace == "" && user.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      user.Name,
+						Namespace: user.Namespace,
+					},
+				})
+			} else if user.Spec.LDAPServerRef.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      user.Name,
+						Namespace: user.Namespace,
+					},
+				})
+			}
+		}
+	}
+
+	return requests
 }

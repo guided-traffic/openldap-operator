@@ -127,11 +127,183 @@ jobs:
       - name: Run linting
         run: make lint
 
+  integration-tests:
+    name: Integration Tests
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Set up Docker Compose V2
+        run: |
+          # Docker Compose V2 is already included in modern Docker installations
+          # Just verify and create alias if needed
+          docker compose version || (
+            echo "Installing Docker Compose V2 plugin..."
+            DOCKER_CONFIG=${DOCKER_CONFIG:-$HOME/.docker}
+            mkdir -p $DOCKER_CONFIG/cli-plugins
+            curl -SL https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-x86_64 -o $DOCKER_CONFIG/cli-plugins/docker-compose
+            chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+          )
+
+      - name: Verify Docker and Docker Compose
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Run integration tests with Docker
+        run: make test-integration
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest  # Use GitHub-hosted runner for Kind-based E2E tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential
+
+      - name: Create Kind cluster
+        uses: helm/kind-action@v1.13.0
+        with:
+          version: v0.30.0
+          node_image: kindest/node:v1.33.4
+          cluster_name: openldap-operator-test
+          wait: 120s
+
+      - name: Verify Kind cluster
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Install LDAP server in Kind
+        run: |
+          kubectl create namespace ldap-test
+          kubectl -n ldap-test create secret generic ldap-admin-pass --from-literal=adminpassword=admin
+          kubectl -n ldap-test apply -f test/e2e/openldap.yaml
+
+      - name: Wait for LDAP server
+        run: kubectl -n ldap-test wait --for=condition=available --timeout=120s deployment/openldap
+
+      - name: Build and load operator image
+        run: |
+          make docker-build IMG=openldap-operator:test
+          kind load docker-image openldap-operator:test --name openldap-operator-test
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: 'v3.16.3'
+
+      - name: Install operator via Helm
+        run: |
+          helm install openldap-operator deploy/helm/openldap-operator \
+            --namespace openldap-operator-system \
+            --create-namespace \
+            --values test/e2e/openldap-operator-values.yaml \
+            --wait \
+            --timeout 120s
+
+      - name: Wait for operator
+        run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator
+
+      - name: Create test resources
+        run: kubectl -n ldap-test apply -f test/e2e/test-resources.yaml
+
+      - name: Wait for controllers to start reconciliation
+        run: |
+          echo "Waiting for initial reconciliation..."
+          sleep 10
+          echo "Triggering reconciliation by annotating LDAPServer..."
+          kubectl -n ldap-test annotate ldapserver test-ldap-server force-sync="$(date +%s)" --overwrite
+
+      - name: Debug resources status
+        run: |
+          echo "=== Operator Deployment Status ==="
+          kubectl -n openldap-operator-system get deployment openldap-operator -o wide
+          echo ""
+          echo "=== Operator Pods ==="
+          kubectl -n openldap-operator-system get pods -l app.kubernetes.io/name=openldap-operator
+          echo ""
+          echo "=== LDAPServer Status ==="
+          kubectl -n ldap-test get ldapserver test-ldap-server -o yaml || true
+          echo ""
+          echo "=== LDAPGroup Status ==="
+          kubectl -n ldap-test get ldapgroup test-group -o yaml || true
+          echo ""
+          echo "=== LDAPUser Status ==="
+          kubectl -n ldap-test get ldapuser test-user -o yaml || true
+          echo ""
+          echo "=== Operator Logs (last 100 lines) ==="
+          kubectl -n openldap-operator-system logs deployment/openldap-operator --tail=100 || true
+
+      - name: Wait for resources to sync
+        run: |
+          echo "Waiting for LDAPServer to connect..."
+          timeout 120s bash -c 'until kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" | grep -q "Connected"; do echo "Current status: $(kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" 2>/dev/null || echo "not ready")"; sleep 5; done'
+          echo "LDAPServer connected!"
+
+          echo "Waiting for LDAPGroup to be ready..."
+          timeout 120s bash -c 'until kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" | grep -q "Ready"; do echo "Current phase: $(kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" 2>/dev/null || echo "not ready")"; sleep 5; done'
+          echo "LDAPGroup ready!"
+
+          echo "Waiting for LDAPUser to be ready..."
+          timeout 120s bash -c 'until kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" | grep -qE "Ready|Warning"; do echo "Current phase: $(kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" 2>/dev/null || echo "not ready")"; sleep 5; done'
+          echo "LDAPUser ready!"
+
+      - name: Verify user in LDAP
+        run: |
+          kubectl -n ldap-test exec deployment/openldap -- \
+            ldapsearch -x -H ldap://localhost:389 -D "cn=admin,dc=example,dc=com" -w admin \
+            -b "cn=testgroup,ou=groups,dc=example,dc=com" memberUid | grep testuser
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "=== Operator Logs ==="
+          kubectl -n openldap-operator-system logs deployment/openldap-operator-controller-manager || true
+          echo "=== LDAP Server Logs ==="
+          kubectl -n ldap-test logs deployment/openldap || true
+          echo "=== Resource Status ==="
+          kubectl -n ldap-test get ldapserver,ldapgroup,ldapuser -o yaml || true
+
+      - name: Cleanup Kind cluster
+        if: always()
+        run: kind delete cluster --name openldap-operator-test || true
+
   semantic-release:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Release
     runs-on: self-hosted
-    needs: [unit-tests, gosec, govulncheck, linter]
+    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests]
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues

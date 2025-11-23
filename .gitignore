@@ -117,5 +117,7 @@ ginkgo
 .dockerignore
 docker-compose*.yml
 docker-compose*.yaml
+# Allow test docker-compose file
+!test/docker-compose.yml
 main
 gosec-report.json

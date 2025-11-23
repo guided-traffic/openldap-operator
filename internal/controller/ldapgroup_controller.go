@@ -28,10 +28,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
@@ -237,6 +240,13 @@ func (r *LDAPGroupReconciler) reconcileGroup(ctx context.Context, conn *ldap.Con
 		}
 	} else {
 		logger.Info("Group does not exist, creating")
+		// Ensure OU exists before creating group
+		ouDN := fmt.Sprintf("ou=%s,%s", ou, ldapServer.Spec.BaseDN)
+		err = r.ensureOUExists(ctx, conn, ouDN, ou)
+		if err != nil {
+			logger.Error(err, "Failed to ensure OU exists", "ou", ouDN)
+			return fmt.Errorf("failed to ensure OU exists: %w", err)
+		}
 		// Create new group
 		err = r.createLDAPGroup(ctx, conn, groupDN, ldapServer, ldapGroup)
 		if err != nil {
@@ -246,6 +256,52 @@ func (r *LDAPGroupReconciler) reconcileGroup(ctx context.Context, conn *ldap.Con
 
 	// Update status with current member information
 	return r.updateGroupStatus(ctx, conn, groupDN, ldapGroup)
+}
+
+// ensureOUExists checks if an OU exists and creates it if it doesn't
+func (r *LDAPGroupReconciler) ensureOUExists(ctx context.Context, conn *ldap.Conn, ouDN string, ouName string) error {
+	logger := log.FromContext(ctx)
+
+	// Check if OU exists
+	searchRequest := ldap.NewSearchRequest(
+		ouDN,
+		ldap.ScopeBaseObject,
+		ldap.NeverDerefAliases,
+		1,
+		30,
+		false,
+		"(objectClass=organizationalUnit)",
+		[]string{"ou"},
+		nil,
+	)
+
+	_, err := conn.Search(searchRequest)
+	if err == nil {
+		// OU exists
+		logger.Info("OU already exists", "dn", ouDN)
+		return nil
+	}
+
+	// Check if error is "No Such Object" - means OU doesn't exist
+	if ldapErr, ok := err.(*ldap.Error); ok && ldapErr.ResultCode == ldap.LDAPResultNoSuchObject {
+		// Create the OU
+		logger.Info("Creating OU", "dn", ouDN, "ou", ouName)
+		addRequest := ldap.NewAddRequest(ouDN, nil)
+		addRequest.Attribute("objectClass", []string{"organizationalUnit"})
+		addRequest.Attribute("ou", []string{ouName})
+
+		err = conn.Add(addRequest)
+		if err != nil {
+			logger.Error(err, "Failed to create OU", "dn", ouDN)
+			return fmt.Errorf("failed to create OU %s: %w", ouDN, err)
+		}
+
+		logger.Info("Successfully created OU", "dn", ouDN)
+		return nil
+	}
+
+	// Some other error occurred
+	return fmt.Errorf("failed to check if OU exists: %w", err)
 }
 
 // createLDAPGroup creates a new group in LDAP
@@ -425,7 +481,25 @@ func (r *LDAPGroupReconciler) updateStatus(ctx context.Context, ldapGroup *openl
 
 	logger.Info("Updating LDAPGroup status", "phase", phase, "message", message)
 
-	if err := r.Status().Update(ctx, ldapGroup); err != nil {
+	// Retry status update on conflict
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Get latest version of the resource
+		latest := &openldapv1.LDAPGroup{}
+		if err := r.Get(ctx, types.NamespacedName{Name: ldapGroup.Name, Namespace: ldapGroup.Namespace}, latest); err != nil {
+			return err
+		}
+
+		// Update status fields on latest version
+		latest.Status.Phase = phase
+		latest.Status.Message = message
+		latest.Status.ObservedGeneration = ldapGroup.Generation
+		latest.Status.Conditions = ldapGroup.Status.Conditions
+		latest.Status.Members = ldapGroup.Status.Members
+
+		return r.Status().Update(ctx, latest)
+	})
+
+	if err != nil {
 		logger.Error(err, "Failed to update LDAPGroup status")
 		return ctrl.Result{}, err
 	}
@@ -507,5 +581,49 @@ func (r *LDAPGroupReconciler) handleDeletion(ctx context.Context, ldapGroup *ope
 func (r *LDAPGroupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&openldapv1.LDAPGroup{}).
+		Watches(
+			&openldapv1.LDAPServer{},
+			handler.EnqueueRequestsFromMapFunc(r.findGroupsForServer),
+		).
 		Complete(r)
+}
+
+// findGroupsForServer finds all LDAPGroups that reference a given LDAPServer
+func (r *LDAPGroupReconciler) findGroupsForServer(ctx context.Context, server client.Object) []reconcile.Request {
+	ldapServer, ok := server.(*openldapv1.LDAPServer)
+	if !ok {
+		return nil
+	}
+
+	// List all LDAPGroups
+	groupList := &openldapv1.LDAPGroupList{}
+	if err := r.List(ctx, groupList); err != nil {
+		return nil
+	}
+
+	// Find groups that reference this server
+	var requests []reconcile.Request
+	for _, group := range groupList.Items {
+		// Check if this group references the server
+		if group.Spec.LDAPServerRef.Name == ldapServer.Name {
+			// Check if they're in the same namespace or if namespace is not specified
+			if group.Spec.LDAPServerRef.Namespace == "" && group.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      group.Name,
+						Namespace: group.Namespace,
+					},
+				})
+			} else if group.Spec.LDAPServerRef.Namespace == ldapServer.Namespace {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      group.Name,
+						Namespace: group.Namespace,
+					},
+				})
+			}
+		}
+	}
+
+	return requests
 }
