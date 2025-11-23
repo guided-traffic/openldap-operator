@@ -1,3 +1,19 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controllers
 
 import (
@@ -18,7 +34,8 @@ import (
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
-// Mock client for testing getSecretValue
+// Mock client for testing getSecretValue functionality
+// Simulates Kubernetes Secret API responses for controlled testing
 type mockClient struct {
 	client.Client
 	secrets map[string]*corev1.Secret
@@ -41,7 +58,7 @@ func (m *mockClient) Get(ctx context.Context, key types.NamespacedName, obj clie
 	return errors.New("unsupported object type")
 }
 
-var _ = Describe("LDAPServer Helper Functions", func() {
+var _ = Describe("LDAPServer Controller", func() {
 	var (
 		reconciler    *LDAPServerReconciler
 		ctx           context.Context
@@ -57,9 +74,14 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 		Expect(openldapv1.AddToScheme(scheme)).To(Succeed())
 	})
 
+	// getSecretValue retrieves credentials from Kubernetes Secrets
+	// This is a critical security function that:
+	// - Fetches secret data from the Kubernetes API
+	// - Validates that the secret and specified key exist
+	// - Returns the password as a string for LDAP authentication
 	Describe("getSecretValue", func() {
-		It("Should successfully retrieve secret value", func() {
-			// Create a test secret
+		It("Should successfully retrieve secret value from valid secret", func() {
+			// Create a test secret with password data
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-secret",
@@ -108,7 +130,7 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 		})
 
 		It("Should return error when key does not exist in secret", func() {
-			// Create a test secret without the expected key
+			// Create a secret but with different keys than expected
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-secret",
@@ -138,8 +160,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 			Expect(err.Error()).To(ContainSubstring("key nonexistent-key not found"))
 		})
 
-		It("Should handle empty secret data", func() {
-			// Create a test secret with empty data
+		It("Should handle empty secret data gracefully", func() {
+			// Secrets with no data should fail appropriately
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "empty-secret",
@@ -167,8 +189,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 			Expect(err.Error()).To(ContainSubstring("key password not found"))
 		})
 
-		It("Should handle secret with empty value", func() {
-			// Create a test secret with empty value
+		It("Should accept secret with empty string value", func() {
+			// Empty passwords are technically valid (though not recommended)
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-secret",
@@ -199,6 +221,12 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 		})
 	})
 
+	// testConnection validates connectivity to external LDAP servers
+	// This function:
+	// - Retrieves bind credentials from Secrets
+	// - Creates LDAP client with appropriate TLS settings
+	// - Attempts to bind to verify connectivity
+	// - Updates LDAPServer status based on results
 	Describe("testConnection", func() {
 		var ldapServer *openldapv1.LDAPServer
 
@@ -221,8 +249,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 			}
 		})
 
-		It("Should return error when secret retrieval fails", func() {
-			// Use mock client that returns error
+		It("Should return error status when secret retrieval fails", func() {
+			// Simulate secret not found scenario
 			mockClient := &mockClient{
 				err: errors.New("secret not found"),
 			}
@@ -237,8 +265,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 			Expect(message).To(ContainSubstring("Failed to get bind password"))
 		})
 
-		It("Should return disconnected status when LDAP connection fails", func() {
-			// Create a secret but use invalid LDAP server (connection will fail)
+		It("Should return disconnected status when LDAP server is unreachable", func() {
+			// Create valid secret but use unreachable LDAP server
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ldap-secret",
@@ -258,7 +286,7 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 				Client: fakeClient,
 			}
 
-			// Use invalid host to force connection failure
+			// Use invalid hostname to force connection failure
 			ldapServer.Spec.Host = "invalid-host-that-does-not-exist"
 
 			status, message, err := reconciler.testConnection(ctx, ldapServer)
@@ -267,8 +295,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 			Expect(message).To(ContainSubstring("Failed to connect to LDAP server"))
 		})
 
-		It("Should handle TLS configuration", func() {
-			// Create a secret
+		It("Should handle TLS configuration correctly", func() {
+			// Test TLS-enabled connection path
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ldap-secret",
@@ -288,14 +316,14 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 				Client: fakeClient,
 			}
 
-			// Configure TLS
+			// Configure TLS settings
 			ldapServer.Spec.TLS = &openldapv1.TLSConfig{
 				Enabled:            true,
 				InsecureSkipVerify: true,
 			}
 			ldapServer.Spec.Port = 636
 
-			// Use invalid host to force connection failure (but test TLS path)
+			// Use invalid host to test TLS code path (will fail to connect)
 			ldapServer.Spec.Host = "invalid-host-that-does-not-exist"
 
 			status, message, err := reconciler.testConnection(ctx, ldapServer)
@@ -304,8 +332,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 			Expect(message).To(ContainSubstring("Failed to connect to LDAP server"))
 		})
 
-		It("Should use custom connection timeout", func() {
-			// Create a secret
+		It("Should respect custom connection timeout", func() {
+			// Verify that custom timeout values are used
 			secret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "ldap-secret",
@@ -325,10 +353,10 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 				Client: fakeClient,
 			}
 
-			// Set custom timeout
+			// Set custom timeout (in seconds)
 			ldapServer.Spec.ConnectionTimeout = 60
 
-			// Use invalid host to force connection failure (but test timeout path)
+			// Use invalid host to test timeout code path
 			ldapServer.Spec.Host = "invalid-host-that-does-not-exist"
 
 			status, message, err := reconciler.testConnection(ctx, ldapServer)
@@ -338,6 +366,8 @@ var _ = Describe("LDAPServer Helper Functions", func() {
 		})
 	})
 
+	// SetupWithManager registers the controller with the controller-runtime manager
+	// This is called during operator initialization to set up watches and reconciliation
 	Describe("SetupWithManager", func() {
 		It("Should setup controller with manager successfully", func() {
 			mgr, err := manager.New(&rest.Config{}, manager.Options{

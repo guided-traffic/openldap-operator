@@ -30,6 +30,10 @@ import (
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
+// TestLDAPGroupReconciler_Reconcile tests the main reconciliation loop for LDAPGroup resources
+// The LDAPGroup controller creates group entries in external LDAP servers
+// Important: Group membership is NOT managed by LDAPGroup - it's managed by LDAPUser resources
+// LDAPGroup only creates the group structure (groupOfNames, posixGroup, etc.)
 func TestLDAPGroupReconciler_Reconcile(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = openldapv1.AddToScheme(scheme)
@@ -186,6 +190,11 @@ func TestLDAPGroupReconciler_Reconcile(t *testing.T) {
 	}
 }
 
+// TestLDAPGroupReconciler_handleDeletion tests the deletion logic for LDAPGroup resources
+// When a LDAPGroup is deleted:
+// 1. The finalizer ensures the group is removed from LDAP before the CR is deleted
+// 2. If LDAP server is unavailable, deletion still proceeds (to prevent blocking)
+// 3. Finalizer is removed to allow Kubernetes to complete the deletion
 func TestLDAPGroupReconciler_handleDeletion(t *testing.T) {
 	scheme := runtime.NewScheme()
 	_ = openldapv1.AddToScheme(scheme)
