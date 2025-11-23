@@ -171,7 +171,7 @@ jobs:
 
   e2e-tests:
     name: E2E Tests
-    runs-on: ubuntu-latest  # Use GitHub-hosted runner for Kind-based E2E tests
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -191,13 +191,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
+      - name: Create Kind config for DinD
+        run: |
+          cat << EOF > kind-config.yaml
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          name: openldap-operator-test
+          nodes:
+          - role: control-plane
+          # Use native snapshotter to avoid nested overlay issues in DinD
+          containerdConfigPatches:
+          - |-
+            [plugins."io.containerd.grpc.v1.cri".containerd]
+              snapshotter = "native"
+              disable_snapshot_annotations = false
+          EOF
+
       - name: Create Kind cluster
+        id: kind-cluster
+        continue-on-error: true
         uses: helm/kind-action@v1.13.0
         with:
           version: v0.30.0
           node_image: kindest/node:v1.33.4
           cluster_name: openldap-operator-test
           wait: 120s
+          ignore_failed_clean: true
+          config: kind-config.yaml
 
       - name: Verify Kind cluster
         run: |
@@ -216,7 +236,9 @@ jobs:
       - name: Build and load operator image
         run: |
           make docker-build IMG=openldap-operator:test
-          kind load docker-image openldap-operator:test --name openldap-operator-test
+          # Import image - containerd will automatically use the native snapshotter from config
+          # Don't specify --snapshotter flag to avoid platform unpacking issues
+          docker save openldap-operator:test | docker exec -i openldap-operator-test-control-plane ctr --namespace=k8s.io images import -
 
       - name: Install Helm
         uses: azure/setup-helm@v4
