@@ -318,11 +318,33 @@ jobs:
             - testgroup
           EOF
 
+      - name: Debug resources status
+        run: |
+          echo "=== LDAPServer Status ==="
+          kubectl -n ldap-test get ldapserver test-ldap-server -o yaml || true
+          echo ""
+          echo "=== LDAPGroup Status ==="
+          kubectl -n ldap-test get ldapgroup test-group -o yaml || true
+          echo ""
+          echo "=== LDAPUser Status ==="
+          kubectl -n ldap-test get ldapuser test-user -o yaml || true
+          echo ""
+          echo "=== Operator Logs ==="
+          kubectl -n openldap-operator-system logs deployment/openldap-operator --tail=50 || true
+
       - name: Wait for resources to sync
         run: |
-          timeout 60s bash -c 'until kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" | grep -q "Connected"; do sleep 2; done'
-          timeout 60s bash -c 'until kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" | grep -q "Ready"; do sleep 2; done'
-          timeout 60s bash -c 'until kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" | grep -qE "Ready|Warning"; do sleep 2; done'
+          echo "Waiting for LDAPServer to connect..."
+          timeout 120s bash -c 'until kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" | grep -q "Connected"; do echo "Current status: $(kubectl -n ldap-test get ldapserver test-ldap-server -o jsonpath="{.status.connectionStatus}" 2>/dev/null || echo "not ready")"; sleep 5; done'
+          echo "LDAPServer connected!"
+
+          echo "Waiting for LDAPGroup to be ready..."
+          timeout 120s bash -c 'until kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" | grep -q "Ready"; do echo "Current phase: $(kubectl -n ldap-test get ldapgroup test-group -o jsonpath="{.status.phase}" 2>/dev/null || echo "not ready")"; sleep 5; done'
+          echo "LDAPGroup ready!"
+
+          echo "Waiting for LDAPUser to be ready..."
+          timeout 120s bash -c 'until kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" | grep -qE "Ready|Warning"; do echo "Current phase: $(kubectl -n ldap-test get ldapuser test-user -o jsonpath="{.status.phase}" 2>/dev/null || echo "not ready")"; sleep 5; done'
+          echo "LDAPUser ready!"
 
       - name: Verify user in LDAP
         run: |
