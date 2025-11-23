@@ -1,0 +1,8 @@
+# Minimal Helm values for E2E testing
+image:
+  repository: openldap-operator
+  tag: test
+  pullPolicy: Never
+
+webhooks:
+  enabled: false

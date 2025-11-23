@@ -208,58 +208,7 @@ jobs:
         run: |
           kubectl create namespace ldap-test
           kubectl -n ldap-test create secret generic ldap-admin-pass --from-literal=adminpassword=admin
-
-          kubectl -n ldap-test apply -f - <<EOF
-          apiVersion: v1
-          kind: Service
-          metadata:
-            name: openldap
-          spec:
-            type: ClusterIP
-            ports:
-            - name: ldap
-              port: 389
-              targetPort: 389
-            selector:
-              app: openldap
-          ---
-          apiVersion: apps/v1
-          kind: Deployment
-          metadata:
-            name: openldap
-          spec:
-            replicas: 1
-            selector:
-              matchLabels:
-                app: openldap
-            template:
-              metadata:
-                labels:
-                  app: openldap
-              spec:
-                containers:
-                - name: openldap
-                  image: osixia/openldap:1.5.0
-                  ports:
-                  - containerPort: 389
-                  env:
-                  - name: LDAP_ORGANISATION
-                    value: "Example Inc"
-                  - name: LDAP_DOMAIN
-                    value: "example.com"
-                  - name: LDAP_ADMIN_PASSWORD
-                    valueFrom:
-                      secretKeyRef:
-                        name: ldap-admin-pass
-                        key: adminpassword
-                  - name: LDAP_TLS
-                    value: "false"
-                  readinessProbe:
-                    tcpSocket:
-                      port: 389
-                    initialDelaySeconds: 10
-                    periodSeconds: 5
-          EOF
+          kubectl -n ldap-test apply -f test/e2e/openldap.yaml
 
       - name: Wait for LDAP server
         run: kubectl -n ldap-test wait --for=condition=available --timeout=120s deployment/openldap
@@ -279,10 +228,7 @@ jobs:
           helm install openldap-operator deploy/helm/openldap-operator \
             --namespace openldap-operator-system \
             --create-namespace \
-            --set image.repository=openldap-operator \
-            --set image.tag=test \
-            --set image.pullPolicy=Never \
-            --set webhooks.enabled=false \
+            --values test/e2e/openldap-operator-values.yaml \
             --wait \
             --timeout 120s
 
@@ -290,55 +236,7 @@ jobs:
         run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator
 
       - name: Create test resources
-        run: |
-          kubectl -n ldap-test apply -f - <<EOF
-          apiVersion: openldap.guided-traffic.com/v1
-          kind: LDAPServer
-          metadata:
-            name: test-ldap-server
-          spec:
-            host: openldap.ldap-test.svc.cluster.local
-            port: 389
-            baseDN: dc=example,dc=com
-            bindDN: cn=admin,dc=example,dc=com
-            bindPasswordSecret:
-              name: ldap-admin-pass
-              key: adminpassword
-            tls:
-              enabled: false
-            healthCheckInterval: 30s
-          ---
-          apiVersion: openldap.guided-traffic.com/v1
-          kind: LDAPGroup
-          metadata:
-            name: test-group
-          spec:
-            ldapServerRef:
-              name: test-ldap-server
-            groupName: testgroup
-            organizationalUnit: groups
-            groupType: posixGroup
-            groupID: 5000
-            description: "Test group"
-          ---
-          apiVersion: openldap.guided-traffic.com/v1
-          kind: LDAPUser
-          metadata:
-            name: test-user
-          spec:
-            ldapServerRef:
-              name: test-ldap-server
-            username: testuser
-            organizationalUnit: users
-            firstName: Test
-            lastName: User
-            displayName: Test User
-            email: testuser@example.com
-            userID: 10001
-            groupID: 5000
-            groups:
-            - testgroup
-          EOF
+        run: kubectl -n ldap-test apply -f test/e2e/test-resources.yaml
 
       - name: Debug resources status
         run: |

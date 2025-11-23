@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: openldap
+spec:
+  type: ClusterIP
+  ports:
+  - name: ldap
+    port: 389
+    targetPort: 389
+  selector:
+    app: openldap
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openldap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openldap
+  template:
+    metadata:
+      labels:
+        app: openldap
+    spec:
+      containers:
+      - name: openldap
+        image: osixia/openldap:1.5.0
+        ports:
+        - containerPort: 389
+        env:
+        - name: LDAP_ORGANISATION
+          value: "Example Inc"
+        - name: LDAP_DOMAIN
+          value: "example.com"
+        - name: LDAP_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ldap-admin-pass
+              key: adminpassword
+        - name: LDAP_TLS
+          value: "false"
+        readinessProbe:
+          tcpSocket:
+            port: 389
+          initialDelaySeconds: 10
+          periodSeconds: 5
