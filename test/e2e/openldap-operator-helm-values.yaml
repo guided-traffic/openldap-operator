@@ -4,5 +4,8 @@ image:
   tag: test
   pullPolicy: Never
 
+imagePullSecrets:
+  - name: dockerhub-credentials
+
 webhooks:
   enabled: false
