@@ -288,7 +288,7 @@ jobs:
     needs: [unit-tests, integration-tests]
     if: always() && (needs.unit-tests.result == 'success' || needs.integration-tests.result == 'success')
     permissions:
-      contents: write  # Needed to commit coverage badge
+      contents: read  # Read only - semantic-release will commit the badge
       pull-requests: write  # Needed to comment on PRs
     steps:
       - name: Checkout
@@ -393,14 +393,12 @@ jobs:
 
           echo "Coverage badge created: ${COVERAGE}% (${COLOR})"
 
-      - name: Commit coverage badge
+      - name: Upload coverage badge as artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add .github/badges/coverage.json
-          git diff --staged --quiet || git commit -m "chore: update coverage badge [skip ci]"
-          git push
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-badge
+          path: .github/badges/coverage.json
 
       - name: Get main branch coverage
         if: github.event_name == 'pull_request'
@@ -633,7 +631,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: Release
     runs-on: self-hosted
-    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests, container-scan]
+    needs: [unit-tests, gosec, govulncheck, linter, integration-tests, e2e-tests, container-scan, coverage-report]
     permissions:
       contents: write # to be able to publish a GitHub release
       issues: write # to be able to comment on released issues
@@ -644,15 +642,27 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+          token: ${{ secrets.BOT_PAT }}
+
+      - name: Download coverage badge
+        uses: actions/download-artifact@v5
+        with:
+          name: coverage-badge
+          path: .github/badges/
+        continue-on-error: true
+
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
+
       - name: Install dependencies
         run: npm install
+
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
         run: npm audit signatures
+
       - name: Release
         env:
-          GITHUB_TOKEN: ${{ secrets.USER_PAT }}
+          GITHUB_TOKEN: ${{ secrets.BOT_PAT }}
         run: npx semantic-release
