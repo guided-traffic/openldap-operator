@@ -8,6 +8,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write  # For PR comments
@@ -192,7 +196,7 @@ jobs:
         run: make docker-build IMG=openldap-operator:scan
 
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@0.30.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: 'openldap-operator:scan'
           format: 'json'
@@ -271,21 +275,12 @@ jobs:
 
             </details>
 
-            <details>
-            <summary>📦 Download Full Report</summary>
-
-            The complete Trivy scan report is available as a workflow artifact:
-            - Download `trivy-scan-results` from the workflow run
-            - The JSON file contains all vulnerability details
-
-            </details>
-
-      # - name: Fail on critical vulnerabilities
-      #   if: steps.trivy-summary.outputs.critical != '0'
-      #   run: |
-      #     echo "❌ Critical vulnerabilities found: ${{ steps.trivy-summary.outputs.critical }}"
-      #     echo "Please review and address critical vulnerabilities before merging."
-      #     exit 1
+      - name: Fail on critical vulnerabilities
+        if: steps.trivy-summary.outputs.critical != '0'
+        run: |
+          echo "❌ Critical vulnerabilities found: ${{ steps.trivy-summary.outputs.critical }}"
+          echo "Please review and address critical vulnerabilities before merging."
+          exit 1
 
   coverage-report:
     name: Combined Coverage Report
@@ -407,6 +402,60 @@ jobs:
           git diff --staged --quiet || git commit -m "chore: update coverage badge [skip ci]"
           git push
 
+      - name: Get main branch coverage
+        if: github.event_name == 'pull_request'
+        id: main-coverage
+        continue-on-error: true
+        run: |
+          # Try to fetch coverage from main branch badge
+          MAIN_COVERAGE="N/A"
+          MAIN_BADGE_URL="https://raw.githubusercontent.com/${{ github.repository }}/main/.github/badges/coverage.json"
+
+          echo "Fetching main branch coverage from: $MAIN_BADGE_URL"
+
+          if curl -f -s "$MAIN_BADGE_URL" -o main-coverage.json; then
+            MAIN_COVERAGE=$(jq -r '.message' main-coverage.json | sed 's/%//')
+            echo "Main branch coverage: ${MAIN_COVERAGE}%"
+          else
+            echo "Could not fetch main branch coverage badge"
+          fi
+
+          echo "percentage=$MAIN_COVERAGE" >> $GITHUB_OUTPUT
+
+      - name: Calculate coverage difference
+        if: github.event_name == 'pull_request'
+        id: coverage-diff
+        run: |
+          CURRENT="${{ steps.merge-coverage.outputs.percentage }}"
+          MAIN="${{ steps.main-coverage.outputs.percentage }}"
+
+          if [ "$MAIN" = "N/A" ]; then
+            echo "diff=N/A" >> $GITHUB_OUTPUT
+            echo "emoji=ℹ️" >> $GITHUB_OUTPUT
+            echo "trend=baseline" >> $GITHUB_OUTPUT
+            echo "Cannot compare - main branch coverage not available"
+          else
+            # Use Python for floating point arithmetic (always available in GitHub Actions)
+            DIFF=$(python3 -c "print(round($CURRENT - $MAIN, 2))")
+            echo "diff=$DIFF" >> $GITHUB_OUTPUT
+
+            # Determine emoji and trend based on difference
+            # Use Python for comparison to avoid bc dependency
+            if [ "$(python3 -c "print(1 if $DIFF > 0 else 0)")" = "1" ]; then
+              echo "emoji=📈" >> $GITHUB_OUTPUT
+              echo "trend=improved" >> $GITHUB_OUTPUT
+              echo "Coverage improved by ${DIFF}%"
+            elif [ "$(python3 -c "print(1 if $DIFF < 0 else 0)")" = "1" ]; then
+              echo "emoji=📉" >> $GITHUB_OUTPUT
+              echo "trend=decreased" >> $GITHUB_OUTPUT
+              echo "Coverage decreased by ${DIFF}%"
+            else
+              echo "emoji=➡️" >> $GITHUB_OUTPUT
+              echo "trend=unchanged" >> $GITHUB_OUTPUT
+              echo "Coverage unchanged"
+            fi
+          fi
+
       - name: Generate coverage summary for PR
         if: github.event_name == 'pull_request'
         id: coverage-summary
@@ -424,27 +473,9 @@ jobs:
           message: |
             ## 📊 Combined Test Coverage Report
 
-            **Total Line Coverage:** `${{ steps.merge-coverage.outputs.percentage }}%`
-
-            This report combines coverage from:
-            - ✅ Unit Tests (controllers, API)
-            - ✅ Integration Tests (LDAP client)
-
-            <details>
-            <summary>📈 View Coverage by Package</summary>
-
-            ${{ env.COVERAGE_SUMMARY }}
-
-            </details>
-
-            <details>
-            <summary>📦 Download Reports</summary>
-
-            The full HTML coverage report is available as a workflow artifact:
-            - Download `coverage-combined` from the workflow run
-            - Open `coverage.html` in your browser for interactive coverage exploration
-
-            </details>
+            **Current Coverage:** `${{ steps.merge-coverage.outputs.percentage }}%`
+            **Main Branch Coverage:** `${{ steps.main-coverage.outputs.percentage }}%`
+            **Difference:** ${{ steps.coverage-diff.outputs.emoji }} `${{ steps.coverage-diff.outputs.diff }}%`
 
   e2e-tests:
     name: E2E Tests
