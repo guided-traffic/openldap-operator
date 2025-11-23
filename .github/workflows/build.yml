@@ -33,7 +33,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          username: hansfischer
+          username: guidedtraffic
           password: ${{ secrets.DOCKERHUB_PAT }}
 
       - name: Docker meta
@@ -41,7 +41,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            hansfischer/openldap-operator
+            guidedtraffic/openldap-operator
           tags: |
             type=schedule
             type=ref,event=branch
@@ -89,7 +89,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: anchore/sbom-action@v0
         with:
-          image: hansfischer/openldap-operator:${{ github.ref_name }}
+          image: guidedtraffic/openldap-operator:${{ github.ref_name }}
           format: spdx-json
           upload-artifact: true
           upload-release-assets: false
@@ -101,7 +101,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ${{ github.workspace }}/hansfischer-openldap-operator_*.spdx.json
+            ${{ github.workspace }}/guidedtraffic-openldap-operator_*.spdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -110,7 +110,7 @@ jobs:
         uses: docker/scout-action@v1
         with:
           command: quickview,cves,recommendations
-          image: hansfischer/openldap-operator:${{ github.ref_name }}
+          image: guidedtraffic/openldap-operator:${{ github.ref_name }}
           sarif-file: scout-report.sarif
           summary: true
 

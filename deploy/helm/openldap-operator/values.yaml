@@ -12,7 +12,7 @@ global:
 # Operator image configuration
 image:
   registry: "docker.io"
-  repository: "hansfischer/openldap-operator"
+  repository: "guidedtraffic/openldap-operator"
   tag: ""  # Defaults to Chart.AppVersion if empty
   pullPolicy: IfNotPresent
 
