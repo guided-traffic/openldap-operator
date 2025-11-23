@@ -303,13 +303,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Download unit test coverage
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-unit
         continue-on-error: true
 
       - name: Download integration test coverage
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: coverage-integration
         continue-on-error: true
