@@ -265,7 +265,7 @@ jobs:
             --timeout 120s
 
       - name: Wait for operator
-        run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator-controller-manager
+        run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator
 
       - name: Create test resources
         run: |
