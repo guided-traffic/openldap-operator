@@ -228,7 +228,7 @@ jobs:
         run: |
           kubectl create namespace ldap-test
           kubectl -n ldap-test create secret generic ldap-admin-pass --from-literal=adminpassword=admin
-          kubectl -n ldap-test apply -f test/e2e/openldap.yaml
+          kubectl -n ldap-test apply -f openldap-server-manifest.yaml
 
       - name: Wait for LDAP server
         run: kubectl -n ldap-test wait --for=condition=available --timeout=120s deployment/openldap
@@ -250,7 +250,7 @@ jobs:
           helm install openldap-operator deploy/helm/openldap-operator \
             --namespace openldap-operator-system \
             --create-namespace \
-            --values test/e2e/openldap-operator-values.yaml \
+            --values test/e2e/openldap-operator-helm-values.yaml \
             --wait \
             --timeout 120s
 
@@ -258,7 +258,7 @@ jobs:
         run: kubectl -n openldap-operator-system wait --for=condition=available --timeout=120s deployment/openldap-operator
 
       - name: Create test resources
-        run: kubectl -n ldap-test apply -f test/e2e/test-resources.yaml
+        run: kubectl -n ldap-test apply -f test/e2e/test-custom-resources.yaml
 
       - name: Wait for controllers to start reconciliation
         run: |
