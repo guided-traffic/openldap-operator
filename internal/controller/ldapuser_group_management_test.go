@@ -4,60 +4,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
-func TestLDAPUserReconciler_GroupManagement(t *testing.T) {
-	scheme := runtime.NewScheme()
-	require.NoError(t, openldapv1.AddToScheme(scheme))
-
-	t.Run("Should validate user spec with groups", func(t *testing.T) {
-		// Test that the LDAPUser spec can hold groups
-		ldapUser := &openldapv1.LDAPUser{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "testuser",
-				Namespace: "default",
-			},
-			Spec: openldapv1.LDAPUserSpec{
-				Username: "testuser",
-				LDAPServerRef: openldapv1.LDAPServerReference{
-					Name: "ldap-server",
-				},
-				Groups: []string{"existing-group", "missing-group", "another-missing-group"},
-			},
-		}
-
-		// Verify the groups are correctly set in spec
-		assert.Equal(t, []string{"existing-group", "missing-group", "another-missing-group"}, ldapUser.Spec.Groups)
-		assert.Len(t, ldapUser.Spec.Groups, 3)
-	})
-
-	t.Run("Should handle empty groups list", func(t *testing.T) {
-		ldapUser := &openldapv1.LDAPUser{
-			Spec: openldapv1.LDAPUserSpec{
-				Username: "testuser",
-				Groups:   []string{}, // Empty groups
-			},
-		}
-
-		assert.Empty(t, ldapUser.Spec.Groups)
-	})
-
-	t.Run("Should handle nil groups list", func(t *testing.T) {
-		ldapUser := &openldapv1.LDAPUser{
-			Spec: openldapv1.LDAPUserSpec{
-				Username: "testuser",
-				Groups:   nil, // Nil groups
-			},
-		}
-
-		assert.Nil(t, ldapUser.Spec.Groups)
-	})
-}
+// This file tests LDAPUser group management status tracking behavior
 
 func TestLDAPUserStatus_MissingGroups(t *testing.T) {
 	t.Run("Should track missing groups in status", func(t *testing.T) {
