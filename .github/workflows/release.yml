@@ -238,8 +238,21 @@ jobs:
       - name: Create test resources
         run: kubectl -n ldap-test apply -f test/e2e/test-resources.yaml
 
+      - name: Wait for controllers to start reconciliation
+        run: |
+          echo "Waiting for initial reconciliation..."
+          sleep 10
+          echo "Triggering reconciliation by annotating LDAPServer..."
+          kubectl -n ldap-test annotate ldapserver test-ldap-server force-sync="$(date +%s)" --overwrite
+
       - name: Debug resources status
         run: |
+          echo "=== Operator Deployment Status ==="
+          kubectl -n openldap-operator-system get deployment openldap-operator -o wide
+          echo ""
+          echo "=== Operator Pods ==="
+          kubectl -n openldap-operator-system get pods -l app.kubernetes.io/name=openldap-operator
+          echo ""
           echo "=== LDAPServer Status ==="
           kubectl -n ldap-test get ldapserver test-ldap-server -o yaml || true
           echo ""
@@ -249,8 +262,8 @@ jobs:
           echo "=== LDAPUser Status ==="
           kubectl -n ldap-test get ldapuser test-user -o yaml || true
           echo ""
-          echo "=== Operator Logs ==="
-          kubectl -n openldap-operator-system logs deployment/openldap-operator --tail=50 || true
+          echo "=== Operator Logs (last 100 lines) ==="
+          kubectl -n openldap-operator-system logs deployment/openldap-operator --tail=100 || true
 
       - name: Wait for resources to sync
         run: |

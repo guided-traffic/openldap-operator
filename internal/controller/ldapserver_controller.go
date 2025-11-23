@@ -53,6 +53,8 @@ type LDAPServerReconciler struct {
 func (r *LDAPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
+	logger.Info("Starting reconciliation for LDAPServer", "ldapserver", req.NamespacedName)
+
 	// Fetch the LDAPServer instance
 	ldapServer := &openldapv1.LDAPServer{}
 	err := r.Get(ctx, req.NamespacedName, ldapServer)
@@ -66,8 +68,11 @@ func (r *LDAPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
+	logger.Info("Retrieved LDAPServer", "host", ldapServer.Spec.Host, "port", ldapServer.Spec.Port)
+
 	// Add finalizer if not present
 	if !controllerutil.ContainsFinalizer(ldapServer, "openldap.guided-traffic.com/finalizer") {
+		logger.Info("Adding finalizer to LDAPServer")
 		controllerutil.AddFinalizer(ldapServer, "openldap.guided-traffic.com/finalizer")
 		if err := r.Update(ctx, ldapServer); err != nil {
 			return ctrl.Result{}, err
@@ -81,10 +86,12 @@ func (r *LDAPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// Test connection to LDAP server
+	logger.Info("Testing connection to LDAP server", "host", ldapServer.Spec.Host, "port", ldapServer.Spec.Port)
 	connectionStatus, message, err := r.testConnection(ctx, ldapServer)
 	if err != nil {
 		logger.Error(err, "Failed to test LDAP connection")
 	}
+	logger.Info("Connection test completed", "status", connectionStatus, "message", message)
 
 	// Update status
 	ldapServer.Status.ConnectionStatus = connectionStatus
