@@ -1,0 +1,13 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: openldap-operator-test
+nodes:
+- role: control-plane
+  # Use fuse-overlayfs instead of native overlay to avoid nested overlay issues
+  extraMounts:
+  - hostPath: /dev/fuse
+    containerPath: /dev/fuse
+containerdConfigPatches:
+- |-
+  [plugins."io.containerd.snapshotter.v1.overlayfs"]
+    mount_options = ["nodev","metacopy=on","redirect_dir=on"]

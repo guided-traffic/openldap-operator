@@ -191,6 +191,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
+      - name: Create Kind config for DinD
+        run: |
+          cat << EOF > kind-config.yaml
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          name: openldap-operator-test
+          nodes:
+          - role: control-plane
+          # Use native snapshotter to avoid nested overlay issues in DinD
+          containerdConfigPatches:
+          - |-
+            [plugins."io.containerd.grpc.v1.cri".containerd]
+              snapshotter = "native"
+              disable_snapshot_annotations = false
+          EOF
+
       - name: Create Kind cluster
         id: kind-cluster
         continue-on-error: true
@@ -201,6 +217,7 @@ jobs:
           cluster_name: openldap-operator-test
           wait: 120s
           ignore_failed_clean: true
+          config: kind-config.yaml
 
       - name: Debug - Wait on failure
         if: steps.kind-cluster.outcome == 'failure'
