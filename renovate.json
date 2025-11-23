@@ -220,11 +220,12 @@
       "/(^|/)values\\.ya?ml$/"
     ]
   },
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Update Docker images in Helm values.yaml files",
-      "fileMatch": [
-        "/(^|/)values\\.ya?ml$"
+      "managerFilePatterns": [
+        "//(^|/)values\\.ya?ml$/"
       ],
       "matchStrings": [
         "repository:\\s*(?<depName>[^\\s]+?)\\s+tag:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
