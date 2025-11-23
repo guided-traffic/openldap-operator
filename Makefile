@@ -168,7 +168,7 @@ clean:
 # Build docker image
 docker-build: test
 	@echo "Building Docker image..."
-	docker build -t ${IMG} .
+	docker build -f Containerfile -t ${IMG} .
 
 # Build and push docker image for cross-platform support
 PLATFORMS ?= linux/arm64,linux/amd64

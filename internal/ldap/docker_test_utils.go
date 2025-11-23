@@ -99,6 +99,7 @@ func (c *LDAPTestContainer) Start() error {
 // cleanupExistingContainers removes any containers that might be using our ports
 func (c *LDAPTestContainer) cleanupExistingContainers() {
 	// Find containers using port 1389
+	// #nosec G204 -- port is validated during container setup, not user input
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("docker ps -q --filter publish=%s", c.port))
 	output, err := cmd.Output()
 	if err == nil && len(output) > 0 {
@@ -214,7 +215,7 @@ func (c *LDAPTestContainer) isServiceReady() bool {
 func (c *LDAPTestContainer) GetConnectionSpec() *v1.LDAPServerSpec {
 	// Parse port as int32
 	var port int32
-	fmt.Sscanf(c.port, "%d", &port)
+	_, _ = fmt.Sscanf(c.port, "%d", &port)
 
 	return &v1.LDAPServerSpec{
 		Host:   "localhost",
@@ -231,7 +232,7 @@ func (c *LDAPTestContainer) GetConnectionSpec() *v1.LDAPServerSpec {
 func (c *LDAPTestContainer) GetTLSConnectionSpec() *v1.LDAPServerSpec {
 	// Parse port as int32
 	var tlsPort int32
-	fmt.Sscanf(c.tlsPort, "%d", &tlsPort)
+	_, _ = fmt.Sscanf(c.tlsPort, "%d", &tlsPort)
 
 	return &v1.LDAPServerSpec{
 		Host:   "localhost",
