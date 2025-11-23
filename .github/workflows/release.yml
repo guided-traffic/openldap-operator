@@ -200,6 +200,7 @@ jobs:
           node_image: kindest/node:v1.33.4
           cluster_name: openldap-operator-test
           wait: 120s
+          ignore_failed_clean: true
 
       - name: Debug - Wait on failure
         if: steps.kind-cluster.outcome == 'failure'
