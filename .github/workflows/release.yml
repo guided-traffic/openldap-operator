@@ -143,6 +143,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: guidedtraffic
+          password: ${{ secrets.DOCKERHUB_PAT }}
+
       - name: Set up Docker Compose V2
         run: |
           # Docker Compose V2 is already included in modern Docker installations
@@ -191,6 +197,12 @@ jobs:
 
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: guidedtraffic
+          password: ${{ secrets.DOCKERHUB_PAT }}
 
       - name: Build container image
         run: make docker-build IMG=openldap-operator:scan
@@ -496,6 +508,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: guidedtraffic
+          password: ${{ secrets.DOCKERHUB_PAT }}
 
       - name: Create Kind config for DinD
         run: |
