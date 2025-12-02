@@ -85,9 +85,11 @@ func (c *LDAPTestContainer) Start() error {
 		ldapImage,
 	)
 
-	output, err := cmd.CombinedOutput()
+	// Use Run() instead of CombinedOutput() since we're starting in detached mode
+	// CombinedOutput() waits for the process to complete, which never happens with -d flag
+	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("failed to start LDAP container: %v, output: %s", err, string(output))
+		return fmt.Errorf("failed to start LDAP container: %v", err)
 	}
 
 	c.running = true
