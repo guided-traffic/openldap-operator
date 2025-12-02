@@ -2,7 +2,7 @@ module github.com/guided-traffic/openldap-operator
 
 go 1.25
 
-toolchain go1.25.4
+toolchain go1.25.5
 
 require (
 	github.com/go-ldap/ldap/v3 v3.4.12
