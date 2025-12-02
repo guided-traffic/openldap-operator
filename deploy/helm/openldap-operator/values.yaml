@@ -188,8 +188,8 @@ crdUpdate:
   enabled: true
   # Image for the CRD update job (uses kubectl)
   image:
-    repository: bitnami/kubectl
-    tag: "1.28"
+    repository: docker.io/guidedtraffic/kubectl
+    tag: "1.33.6"
     pullPolicy: IfNotPresent
   # Resource limits for the CRD update job
   resources: {}
