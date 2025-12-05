@@ -232,6 +232,19 @@
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "Update GO_VERSION in GitHub Actions workflows",
+      "managerFilePatterns": [
+        "/.github/workflows/*.yml/"
+      ],
+      "matchStrings": [
+        "GO_VERSION:\\s*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"
+      ],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version",
+      "versioningTemplate": "semver"
     }
   ],
   "commitMessagePrefix": "fix(deps): ",
