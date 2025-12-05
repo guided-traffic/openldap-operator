@@ -56,8 +56,8 @@ func (c *LDAPTestContainer) Start() error {
 	// Remove any existing container with the same name
 	_ = exec.Command("docker", "rm", "-f", c.containerName).Run() // #nosec G204 -- containerName is managed internally
 
-	// Wait longer to ensure port is fully released by the OS
-	time.Sleep(2 * time.Second)
+	// Wait to ensure port is released by the OS
+	time.Sleep(1 * time.Second)
 
 	// Start new container
 	// #nosec G204 -- Using trusted container image and sanitized inputs
@@ -126,7 +126,7 @@ func (c *LDAPTestContainer) cleanupExistingContainers() {
 	}
 
 	// Wait for cleanup to complete
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 }
 
 // Stop stops and removes the LDAP Docker container
@@ -143,8 +143,8 @@ func (c *LDAPTestContainer) Stop() error {
 
 	c.running = false
 
-	// Wait longer to ensure port is fully released by the OS
-	time.Sleep(2 * time.Second)
+	// Wait to ensure port is released by the OS
+	time.Sleep(1 * time.Second)
 
 	return nil
 }

@@ -13,6 +13,10 @@ import (
 
 var scheme *runtime.Scheme
 
+// Shared test container for all integration tests
+var sharedContainer *LDAPTestContainer
+var sharedContainerAvailable bool
+
 func TestLDAP(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "LDAP Suite")
@@ -22,4 +26,20 @@ var _ = BeforeSuite(func() {
 	scheme = runtime.NewScheme()
 	Expect(clientgoscheme.AddToScheme(scheme)).To(Succeed())
 	Expect(openldapv1.AddToScheme(scheme)).To(Succeed())
+
+	// Start shared container for integration tests if Docker is available
+	if IsDockerAvailable() {
+		sharedContainer = NewLDAPTestContainer()
+		err := sharedContainer.Start()
+		if err == nil {
+			sharedContainerAvailable = true
+		}
+	}
+})
+
+var _ = AfterSuite(func() {
+	// Stop shared container
+	if sharedContainer != nil {
+		sharedContainer.Stop()
+	}
 })

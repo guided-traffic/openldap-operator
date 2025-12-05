@@ -2,7 +2,6 @@ package ldap
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/go-ldap/ldap/v3"
 	. "github.com/onsi/ginkgo/v2"
@@ -13,38 +12,34 @@ import (
 
 var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 	var (
-		container     *LDAPTestContainer
 		client        *Client
 		spec          *v1.LDAPServerSpec
 		adminPassword string
 	)
 
 	BeforeEach(func() {
-		EnsureDockerAvailable()
+		// Skip if shared container is not available
+		if !sharedContainerAvailable {
+			Skip("Docker is not available or shared container failed to start")
+		}
 
-		container = NewLDAPTestContainer()
-
-		// Start LDAP container
-		err := container.Start()
-		Expect(err).NotTo(HaveOccurred())
-
-		spec = container.GetConnectionSpec()
-		adminPassword = container.GetAdminPassword()
+		spec = sharedContainer.GetConnectionSpec()
+		adminPassword = sharedContainer.GetAdminPassword()
 
 		// Create client
+		var err error
 		client, err = NewClient(spec, adminPassword)
 		Expect(err).NotTo(HaveOccurred())
 
-		// Setup organizational units
+		// Setup organizational units (idempotent)
 		setupOrganizationalUnits(client, spec.BaseDN)
 	})
 
 	AfterEach(func() {
 		if client != nil {
+			// Clean up test data created during this test
+			cleanupTestData(client, spec.BaseDN)
 			client.Close()
-		}
-		if container != nil {
-			container.Stop()
 		}
 	})
 
@@ -495,6 +490,47 @@ var _ = Describe("LDAP Client Integration Tests (Fixed)", func() {
 	})
 })
 
+// cleanupTestData removes all test users and groups created during tests
+func cleanupTestData(client *Client, baseDN string) {
+	// Delete all users in the users OU
+	usersOU := fmt.Sprintf("ou=users,%s", baseDN)
+	searchReq := ldap.NewSearchRequest(
+		usersOU,
+		ldap.ScopeSingleLevel,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		"(objectClass=inetOrgPerson)",
+		[]string{"dn"},
+		nil,
+	)
+	result, err := client.conn.Search(searchReq)
+	if err == nil {
+		for _, entry := range result.Entries {
+			delReq := ldap.NewDelRequest(entry.DN, nil)
+			_ = client.conn.Del(delReq) // Ignore errors
+		}
+	}
+
+	// Delete all groups in the groups OU
+	groupsOU := fmt.Sprintf("ou=groups,%s", baseDN)
+	searchReq = ldap.NewSearchRequest(
+		groupsOU,
+		ldap.ScopeSingleLevel,
+		ldap.NeverDerefAliases,
+		0, 0, false,
+		"(|(objectClass=posixGroup)(objectClass=groupOfNames)(objectClass=groupOfUniqueNames))",
+		[]string{"dn"},
+		nil,
+	)
+	result, err = client.conn.Search(searchReq)
+	if err == nil {
+		for _, entry := range result.Entries {
+			delReq := ldap.NewDelRequest(entry.DN, nil)
+			_ = client.conn.Del(delReq) // Ignore errors
+		}
+	}
+}
+
 // setupOrganizationalUnits creates the required organizational units
 func setupOrganizationalUnits(client *Client, baseDN string) {
 	// Create users OU
@@ -503,9 +539,11 @@ func setupOrganizationalUnits(client *Client, baseDN string) {
 	req.Attribute("objectClass", []string{"organizationalUnit"})
 	req.Attribute("ou", []string{"users"})
 	err := client.conn.Add(req)
-	if err != nil && !strings.Contains(err.Error(), "Already exists") {
-		// Ignore if already exists, fail for other errors
-		if !strings.Contains(err.Error(), "Already exists") {
+	// Ignore "Entry Already Exists" error (LDAP code 68)
+	if err != nil {
+		if ldapErr, ok := err.(*ldap.Error); ok && ldapErr.ResultCode == 68 {
+			// Entry already exists, this is fine
+		} else {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	}
@@ -516,9 +554,11 @@ func setupOrganizationalUnits(client *Client, baseDN string) {
 	req.Attribute("objectClass", []string{"organizationalUnit"})
 	req.Attribute("ou", []string{"groups"})
 	err = client.conn.Add(req)
-	if err != nil && !strings.Contains(err.Error(), "Already exists") {
-		// Ignore if already exists, fail for other errors
-		if !strings.Contains(err.Error(), "Already exists") {
+	// Ignore "Entry Already Exists" error (LDAP code 68)
+	if err != nil {
+		if ldapErr, ok := err.(*ldap.Error); ok && ldapErr.ResultCode == 68 {
+			// Entry already exists, this is fine
+		} else {
 			Expect(err).NotTo(HaveOccurred())
 		}
 	}
