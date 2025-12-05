@@ -116,7 +116,7 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/scout-action@v1
         with:
-          command: quickview,cves,recommendations
+          command: cves
           image: guidedtraffic/openldap-operator:${{ steps.version.outputs.version }}
           sarif-file: scout-report.sarif
           summary: true
