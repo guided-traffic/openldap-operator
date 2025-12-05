@@ -50,14 +50,14 @@ func NewLDAPTestContainer() *LDAPTestContainer {
 func (c *LDAPTestContainer) Start() error {
 	By("Starting LDAP Docker container")
 
-	// Clean up any existing containers using the same ports
+	// Clean up any existing containers using the same ports (more aggressive cleanup)
 	c.cleanupExistingContainers()
 
 	// Remove any existing container with the same name
 	_ = exec.Command("docker", "rm", "-f", c.containerName).Run() // #nosec G204 -- containerName is managed internally
 
-	// Wait a bit to ensure port is released
-	time.Sleep(500 * time.Millisecond)
+	// Wait longer to ensure port is fully released by the OS
+	time.Sleep(2 * time.Second)
 
 	// Start new container
 	// #nosec G204 -- Using trusted container image and sanitized inputs
@@ -85,11 +85,10 @@ func (c *LDAPTestContainer) Start() error {
 		ldapImage,
 	)
 
-	// Use Run() instead of CombinedOutput() since we're starting in detached mode
-	// CombinedOutput() waits for the process to complete, which never happens with -d flag
-	err := cmd.Run()
+	// Use CombinedOutput() to capture any error messages from Docker
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to start LDAP container: %v", err)
+		return fmt.Errorf("failed to start LDAP container: %v, output: %s", err, string(output))
 	}
 
 	c.running = true
@@ -100,7 +99,7 @@ func (c *LDAPTestContainer) Start() error {
 
 // cleanupExistingContainers removes any containers that might be using our ports
 func (c *LDAPTestContainer) cleanupExistingContainers() {
-	// Find containers using port 1389
+	// Find and remove containers using port 1389
 	// #nosec G204 -- port is validated during container setup, not user input
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("docker ps -q --filter publish=%s", c.port))
 	output, err := cmd.Output()
@@ -111,9 +110,23 @@ func (c *LDAPTestContainer) cleanupExistingContainers() {
 				_ = exec.Command("docker", "rm", "-f", id).Run() // #nosec G204 -- containerID from docker command
 			}
 		}
-		// Wait for cleanup
-		time.Sleep(1 * time.Second)
 	}
+
+	// Also clean up any old test containers by name pattern
+	// #nosec G204 -- Using fixed container name prefix
+	cmd = exec.Command("sh", "-c", "docker ps -aq --filter name=test-openldap-container")
+	output, err = cmd.Output()
+	if err == nil && len(output) > 0 {
+		containerIDs := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, id := range containerIDs {
+			if id != "" {
+				_ = exec.Command("docker", "rm", "-f", id).Run() // #nosec G204 -- containerID from docker command
+			}
+		}
+	}
+
+	// Wait for cleanup to complete
+	time.Sleep(2 * time.Second)
 }
 
 // Stop stops and removes the LDAP Docker container
@@ -130,8 +143,8 @@ func (c *LDAPTestContainer) Stop() error {
 
 	c.running = false
 
-	// Wait to ensure port is released
-	time.Sleep(500 * time.Millisecond)
+	// Wait longer to ensure port is fully released by the OS
+	time.Sleep(2 * time.Second)
 
 	return nil
 }
