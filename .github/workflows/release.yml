@@ -47,7 +47,7 @@ jobs:
           echo "Unit test coverage generated"
 
       - name: Upload unit test coverage
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-unit
           path: coverage-unit.out
@@ -173,7 +173,7 @@ jobs:
           echo "Integration test coverage generated"
 
       - name: Upload integration test coverage
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-integration
           path: coverage-integration.out
@@ -260,7 +260,7 @@ jobs:
           fi
 
       - name: Upload Trivy results
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: trivy-scan-results
           path: trivy-results.json
@@ -315,13 +315,13 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
 
       - name: Download unit test coverage
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: coverage-unit
         continue-on-error: true
 
       - name: Download integration test coverage
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: coverage-integration
         continue-on-error: true
@@ -369,7 +369,7 @@ jobs:
           grep -v "total:" coverage/coverage.txt | awk '{printf "- **%s**: %s\n", $1, $3}' >> coverage/summary.txt || true
 
       - name: Upload combined coverage report
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-combined
           path: coverage/
@@ -407,7 +407,7 @@ jobs:
 
       - name: Upload coverage badge as artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: coverage-badge
           path: .github/badges/coverage.json
@@ -678,7 +678,7 @@ jobs:
           token: ${{ secrets.BOT_PAT }}
 
       - name: Download coverage badge
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: coverage-badge
           path: .github/badges/
