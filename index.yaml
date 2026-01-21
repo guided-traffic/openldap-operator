@@ -8,8 +8,39 @@ entries:
       licenses: Apache-2.0
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
+    appVersion: 1.10.22
+    created: "2026-01-21T11:34:03.801645802Z"
+    description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
+      instances with user/group/ACL management
+    digest: 202da524e348e27f148b4ae2e584c36ed6a3587e59565a2a0eca91d22ac4e566
+    home: https://github.com/guided-traffic/openldap-operator
+    icon: https://raw.githubusercontent.com/openldap/openldap/master/doc/guide/admin/openldap-logo.png
+    keywords:
+    - openldap
+    - ldap
+    - operator
+    - kubernetes
+    - user-management
+    - directory-services
+    maintainers:
+    - email: info@guided-traffic.com
+      name: guided-traffic
+    name: openldap-operator
+    sources:
+    - https://github.com/guided-traffic/openldap-operator
+    type: application
+    urls:
+    - https://guided-traffic.github.io/openldap-operator/openldap-operator-1.10.22.tgz
+    version: 1.10.22
+  - annotations:
+      capabilities.tbs.io/level: Full Lifecycle
+      capabilities.tbs.io/operator: "true"
+      category: Infrastructure
+      licenses: Apache-2.0
+      operator.sdk.io/project-layout: go.kubebuilder.io/v3
+    apiVersion: v2
     appVersion: 1.10.21
-    created: "2026-01-09T13:41:15.729550525Z"
+    created: "2026-01-21T11:34:03.800394004Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 7a594928da0802eb791203c37bf78690497fdba92711f21fd3bb440a94dc04ea
@@ -40,7 +71,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.20
-    created: "2026-01-09T13:41:15.728739772Z"
+    created: "2026-01-21T11:34:03.799591096Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: d75b819565a55d1004aee703f9f68bc9bc3afb5fd2f7da2d4ad75b2e1dc0073d
@@ -71,7 +102,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.19
-    created: "2026-01-09T13:41:15.726898779Z"
+    created: "2026-01-21T11:34:03.798269357Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: a1aebd4f1a017da602382f40997b0c6c4445fef314a6cb9dcf1130a98271b615
@@ -102,7 +133,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.18
-    created: "2026-01-09T13:41:15.726182225Z"
+    created: "2026-01-21T11:34:03.797432704Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 77393520d5d7a5128a535625c00ecbeff40cbd215226a5357ec1b91c8cd96b55
@@ -133,7 +164,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.17
-    created: "2026-01-09T13:41:15.725404022Z"
+    created: "2026-01-21T11:34:03.796613024Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 112c23168e8560f9efd01ab24fe546bbbd4e13e4069a765fc9210bb114e7cd21
@@ -164,7 +195,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.16
-    created: "2026-01-09T13:41:15.724613788Z"
+    created: "2026-01-21T11:34:03.795878486Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 8671ece5a35f1e63ef76f9f85993272b4b5ebde94de8ab0a42f65d36fae8d2d2
@@ -195,7 +226,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.15
-    created: "2026-01-09T13:41:15.723736577Z"
+    created: "2026-01-21T11:34:03.795168802Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: a5b8f6cdcaef719df2d333b607b5c5bec4ec6ad45743977d62d91b88e44244cc
@@ -226,7 +257,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.14
-    created: "2026-01-09T13:41:15.72225255Z"
+    created: "2026-01-21T11:34:03.793484337Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: f6712062baf9cec161a2316ccb9d911bd62a101968586454dc73b491309b6482
@@ -257,7 +288,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.13
-    created: "2026-01-09T13:41:15.721347387Z"
+    created: "2026-01-21T11:34:03.792747565Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 4ffc3ca436d165d118ce819b8e172b2b7193206b50d56351efda95effb2eb841
@@ -288,7 +319,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.12
-    created: "2026-01-09T13:41:15.72053386Z"
+    created: "2026-01-21T11:34:03.792055265Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 83c1ffe55ced6e53582223fec91404c83d1131f2af301aa15121cb351505731a
@@ -319,7 +350,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.11
-    created: "2026-01-09T13:41:15.719670616Z"
+    created: "2026-01-21T11:34:03.791368597Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 05f43c360326f94be24367194c2d3b9836b554f6fdff74e12510622e83b0b81d
@@ -350,7 +381,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.10
-    created: "2026-01-09T13:41:15.718828514Z"
+    created: "2026-01-21T11:34:03.790635731Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 6982c2c9c71eb1bb1b37f2d3e794666c7cabb1ff618d5ec618c47aa4a36c7142
@@ -381,7 +412,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.9
-    created: "2026-01-09T13:41:15.733764036Z"
+    created: "2026-01-21T11:34:03.806122436Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: d0e4bed7bcf50d804ae26d6236aaaf0f9bf46f4f484f8a41f0c81213e98811a4
@@ -412,7 +443,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.8
-    created: "2026-01-09T13:41:15.733010832Z"
+    created: "2026-01-21T11:34:03.80545297Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 41d315212405c42ed4447b331888a1b51befab8ee053a3cbf0536150228f5e24
@@ -443,7 +474,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.6
-    created: "2026-01-09T13:41:15.73227495Z"
+    created: "2026-01-21T11:34:03.804528834Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 209db348d2bf493762784eb044da9b51b40690e99eab854c9cde1308cdd93e01
@@ -474,7 +505,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.4
-    created: "2026-01-09T13:41:15.731487259Z"
+    created: "2026-01-21T11:34:03.80356508Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: f031898f9d67763701a01ed13d0a87c3fd08eced905475c272eecfde8b3273b3
@@ -505,7 +536,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.3
-    created: "2026-01-09T13:41:15.730274254Z"
+    created: "2026-01-21T11:34:03.802836714Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 36db39d3852da90a9c031166b4b6ef32c44ea43fa749c6d5f75853e59e5b1782
@@ -536,7 +567,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.2
-    created: "2026-01-09T13:41:15.72791927Z"
+    created: "2026-01-21T11:34:03.79893229Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 24765f72f240aa4f04b3b01e076313e70478b43420ce8f08af3642d661d138f2
@@ -567,7 +598,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.1
-    created: "2026-01-09T13:41:15.718079105Z"
+    created: "2026-01-21T11:34:03.789925758Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 6ce358929abb00e2efabff804115b96237ac7c32b198e48759a616a2335ece5b
@@ -598,7 +629,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.10.0
-    created: "2026-01-09T13:41:15.71721948Z"
+    created: "2026-01-21T11:34:03.789090759Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 72b950120d6fa5243c1fe1f4cc740ffa8100cd7718817189d1e72e22542712b9
@@ -629,7 +660,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.9.3
-    created: "2026-01-09T13:41:15.755784832Z"
+    created: "2026-01-21T11:34:03.826244969Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: ede07acd6e43055be0dd20e63da1f03684f560fc82e676344b24aa6830d9166d
@@ -660,7 +691,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.9.2
-    created: "2026-01-09T13:41:15.754971404Z"
+    created: "2026-01-21T11:34:03.825547631Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 5fc457e651917a77072a8f5792c63b2f8dc2a959419b4964053951b80f55a020
@@ -691,7 +722,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.9.1
-    created: "2026-01-09T13:41:15.753987111Z"
+    created: "2026-01-21T11:34:03.824759671Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 16e9b4a8110812affd761f48f31da385d6c4727ae981dbde3ef9025be444b080
@@ -722,7 +753,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.9.0
-    created: "2026-01-09T13:41:15.752376104Z"
+    created: "2026-01-21T11:34:03.824033728Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 89c4b7447cbaaac605c9c2c45d1a5ef9a8c5e74b1b785703263b6fe6a63aa3db
@@ -753,7 +784,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.8.0
-    created: "2026-01-09T13:41:15.751218264Z"
+    created: "2026-01-21T11:34:03.823349635Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 336854366b634ad77849e27779c7d48a6527495a42991b66dfab78b2fbb10c5b
@@ -784,7 +815,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.7.4
-    created: "2026-01-09T13:41:15.7502915Z"
+    created: "2026-01-21T11:34:03.822338442Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: fffc03f88bda21d9ca12e35e92d8bff34a34d0566832b41020db8b15f9832242
@@ -815,7 +846,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.7.3
-    created: "2026-01-09T13:41:15.749369817Z"
+    created: "2026-01-21T11:34:03.821423772Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 68ec7f6c9531c82d630f8f096174af03edff8319f570cbd5d031425fdda97740
@@ -846,7 +877,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.7.2
-    created: "2026-01-09T13:41:15.748665525Z"
+    created: "2026-01-21T11:34:03.820716465Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: b5617e5fdb5dc64f44860440be2757f22b082bbf3530832cbb258e47c2b79a10
@@ -877,7 +908,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.7.1
-    created: "2026-01-09T13:41:15.747984216Z"
+    created: "2026-01-21T11:34:03.820014287Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: b9ed563ced7425445145ab509d1d464a99be87ac24344794753a31d9d9da33dc
@@ -908,7 +939,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.7.0
-    created: "2026-01-09T13:41:15.747293388Z"
+    created: "2026-01-21T11:34:03.819293423Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 637cb42341546f369f276fdde6053b81d5cf949aad5d139cee96e597acdb6aac
@@ -939,7 +970,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.8
-    created: "2026-01-09T13:41:15.746593245Z"
+    created: "2026-01-21T11:34:03.818560619Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 4c2a3a297a3e54f838a403c03380c0395adf2a1968eeab1114853e2ad3844ae9
@@ -970,7 +1001,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.7
-    created: "2026-01-09T13:41:15.74585084Z"
+    created: "2026-01-21T11:34:03.817788016Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 792109e9a86bd084a4e0c97daa22ffa5a875dcf85bd3a8853448a98380357df9
@@ -1001,7 +1032,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.6
-    created: "2026-01-09T13:41:15.744536043Z"
+    created: "2026-01-21T11:34:03.816995308Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 23c7fe2d4f27087f1c5a8a2dc9e31939bb6bb9a6096cdf113b659192553ff8b4
@@ -1032,7 +1063,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.5
-    created: "2026-01-09T13:41:15.743736951Z"
+    created: "2026-01-21T11:34:03.815679851Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 32e72249da178423b84caf2b5d80219d098ed48d4e0dbfd4013cdb39f1c74e84
@@ -1063,7 +1094,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.4
-    created: "2026-01-09T13:41:15.742978587Z"
+    created: "2026-01-21T11:34:03.814812781Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 5077afa129de33928419efdae2949cda368e21c743ec9c30c6ee74bd683cf58e
@@ -1094,7 +1125,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.3
-    created: "2026-01-09T13:41:15.74224489Z"
+    created: "2026-01-21T11:34:03.813943096Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: db4d359409cc9aeb820bb324195eb1a53504a4f92c5e18bc3fcdcd477b19171e
@@ -1125,7 +1156,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.2
-    created: "2026-01-09T13:41:15.741224469Z"
+    created: "2026-01-21T11:34:03.813131832Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 2617bc6c5ddf0d78c36915d1c0b0c76870ebef8dae754024d75efc7e05ad3dd5
@@ -1156,7 +1187,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.1
-    created: "2026-01-09T13:41:15.740349473Z"
+    created: "2026-01-21T11:34:03.812425136Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 96cead1157ddde1101b087efa6f905064f0bbae027f04ae29bc09d98fe0af5a5
@@ -1187,7 +1218,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.6.0
-    created: "2026-01-09T13:41:15.739599946Z"
+    created: "2026-01-21T11:34:03.811618882Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: a8d291f02763b2bc0478acc4d9c30f59c651a0d8630030692faa5df4fd6a9fe2
@@ -1218,7 +1249,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.5.0
-    created: "2026-01-09T13:41:15.738776638Z"
+    created: "2026-01-21T11:34:03.81085641Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: f57febb846189d59e34f13cca807651911fc7da3ac37d7212345b656d135d741
@@ -1249,7 +1280,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.4.0
-    created: "2026-01-09T13:41:15.737814969Z"
+    created: "2026-01-21T11:34:03.810203174Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: e1edc82d408f8b9b77e6d6489f305d09db2960372a813e94a10f6a58eba2fc42
@@ -1280,7 +1311,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.3.3
-    created: "2026-01-09T13:41:15.736658511Z"
+    created: "2026-01-21T11:34:03.809502859Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: fc4b81bc6729700cc47d23df322b8cc76a53269f58d14ecc3a9f163dc70447ea
@@ -1311,7 +1342,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.3.2
-    created: "2026-01-09T13:41:15.73597052Z"
+    created: "2026-01-21T11:34:03.808169689Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 010353bca3ffcd4212d14ded761f40a55b31dd62917d4401c28e63b436347f32
@@ -1342,7 +1373,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.3.1
-    created: "2026-01-09T13:41:15.735171509Z"
+    created: "2026-01-21T11:34:03.807502617Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 407cf510ec77299bc011f7976de7b477b6aa841ea31860798b6d9f1f678f0ec4
@@ -1373,7 +1404,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.2.0
-    created: "2026-01-09T13:41:15.734456576Z"
+    created: "2026-01-21T11:34:03.806847438Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 819f2fdbc0e604b8e8f1193c5d8b47b71dbfba27e55f618ec08a8b80ae65db7a
@@ -1404,7 +1435,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.1.0
-    created: "2026-01-09T13:41:15.71651692Z"
+    created: "2026-01-21T11:34:03.788236614Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 67348424b06e473d08687d3e7101d4985153ff6638a317b31de511e9b21a5e92
@@ -1435,7 +1466,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.0.1
-    created: "2026-01-09T13:41:15.715759067Z"
+    created: "2026-01-21T11:34:03.786752738Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 747444d2b40b083973d9f37b146d5f1c086733ec69e38eb0cafe9269edebede8
@@ -1466,7 +1497,7 @@ entries:
       operator.sdk.io/project-layout: go.kubebuilder.io/v3
     apiVersion: v2
     appVersion: 1.0.0
-    created: "2026-01-09T13:41:15.714251445Z"
+    created: "2026-01-21T11:34:03.7859501Z"
     description: A Helm chart for the OpenLDAP Operator - managing external OpenLDAP
       instances with user/group/ACL management
     digest: 3617dd488dec5f08f4da0b20e9ae0cc14109daf4ef61e8a08228bf38f4e03083
@@ -1489,4 +1520,4 @@ entries:
     urls:
     - https://guided-traffic.github.io/openldap-operator/openldap-operator-1.0.0.tgz
     version: 1.0.0
-generated: "2026-01-09T13:41:15.713060342Z"
+generated: "2026-01-21T11:34:03.784992759Z"
