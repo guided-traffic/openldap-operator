@@ -29,26 +29,31 @@
   "forkProcessing": "disabled",
   "packageRules": [
     {
-      "description": "Group Go language updates with golang.org/x packages",
+      "description": "Group all Go-related updates: go.mod, workflows, Containerfile, and golang.org/x packages",
       "matchDatasources": [
         "golang-version",
-        "go"
+        "go",
+        "docker"
       ],
       "matchManagers": [
-        "gomod"
+        "gomod",
+        "regex",
+        "dockerfile"
       ],
       "matchPackageNames": [
         "go",
+        "golang",
         "/^golang.org/x//"
       ],
       "matchDepNames": [
         "go"
       ],
-      "groupName": "Go and golang.org/x packages",
+      "groupName": "Go ecosystem",
       "automerge": false,
       "automergeType": "pr",
       "semanticCommitType": "fix",
-      "semanticCommitScope": "deps"
+      "semanticCommitScope": "deps",
+      "additionalBranchPrefix": ""
     },
     {
       "description": "Automatically merge patch updates for Go modules",
@@ -258,7 +263,23 @@
       ],
       "depNameTemplate": "go",
       "datasourceTemplate": "golang-version",
-      "versioningTemplate": "semver"
+      "versioningTemplate": "semver",
+      "groupName": "Go ecosystem"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Golang Docker image in Containerfile",
+      "managerFilePatterns": [
+        "/Containerfile/",
+        "/Dockerfile/"
+      ],
+      "matchStrings": [
+        "FROM golang:(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)(-[a-z]+)?"
+      ],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "groupName": "Go ecosystem"
     }
   ],
   "commitMessagePrefix": "fix(deps): ",

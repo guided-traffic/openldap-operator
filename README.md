@@ -1,7 +1,7 @@
 # OpenLDAP Operator
 
 ![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/guided-traffic/openldap-operator/main/.github/badges/coverage.json)
-![Go Version](https://img.shields.io/badge/go-1.25+-blue)
+![Go Version](https://img.shields.io/badge/go-1.26+-blue)
 ![Kubernetes](https://img.shields.io/badge/kubernetes-1.25+-blue)
 ![Docker](https://img.shields.io/badge/docker-required%20for%20tests-blue)
 
