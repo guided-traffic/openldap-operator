@@ -29,6 +29,20 @@
   "forkProcessing": "disabled",
   "packageRules": [
     {
+      "description": "Group Go language updates with golang.org/x packages",
+      "matchDatasources": [
+        "golang-version",
+        "go"
+      ],
+      "matchPackageNames": [
+        "go",
+        "/^golang.org/x//"
+      ],
+      "groupName": "Go and golang.org/x packages",
+      "automerge": false,
+      "automergeType": "pr"
+    },
+    {
       "description": "Automatically merge patch updates for Go modules",
       "matchManagers": [
         "gomod"
@@ -37,25 +51,10 @@
         "patch"
       ],
       "automerge": true,
-      "automergeType": "pr"
-    },
-    {
-      "description": "Group minor and patch updates for Go standard library",
-      "matchManagers": [
-        "gomod"
-      ],
-      "groupName": "golang.org/x packages",
-      "automerge": false,
       "automergeType": "pr",
       "matchPackageNames": [
-        "/^golang.org/x//"
-      ],
-      "matchDepTypes": [
-        "require",
-        "indirect"
-      ],
-      "rangeStrategy": "update-lockfile",
-      "enabled": true
+        "!/^golang.org/x//"
+      ]
     },
     {
       "description": "Group Kubernetes dependencies updates",
