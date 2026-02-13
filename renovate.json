@@ -34,13 +34,21 @@
         "golang-version",
         "go"
       ],
+      "matchManagers": [
+        "gomod"
+      ],
       "matchPackageNames": [
         "go",
         "/^golang.org/x//"
       ],
+      "matchDepNames": [
+        "go"
+      ],
       "groupName": "Go and golang.org/x packages",
       "automerge": false,
-      "automergeType": "pr"
+      "automergeType": "pr",
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps"
     },
     {
       "description": "Automatically merge patch updates for Go modules",
@@ -202,7 +210,14 @@
       "gomodTidy",
       "gomodUpdateImportPaths"
     ],
-    "rangeStrategy": "update-lockfile"
+    "rangeStrategy": "update-lockfile",
+    "constraints": {
+      "go": "1.26"
+    }
+  },
+  "ignorePaths": [],
+  "constraints": {
+    "go": ">=1.26"
   },
   "dockerfile": {
     "enabled": true
