@@ -189,7 +189,7 @@ crdUpdate:
   # Image for the CRD update job (uses kubectl)
   image:
     repository: docker.io/guidedtraffic/kubectl
-    tag: "1.35.0"
+    tag: "1.35.1"
     pullPolicy: IfNotPresent
   # Resource limits for the CRD update job
   resources: {}
