@@ -43,7 +43,19 @@
       "matchPackageNames": [
         "go",
         "golang",
-        "/^golang.org/x//"
+        "golang.org/x/crypto",
+        "golang.org/x/mod",
+        "golang.org/x/net",
+        "golang.org/x/oauth2",
+        "golang.org/x/sync",
+        "golang.org/x/sys",
+        "golang.org/x/term",
+        "golang.org/x/text",
+        "golang.org/x/time",
+        "golang.org/x/tools"
+      ],
+      "matchPackagePatterns": [
+        "^golang\\.org/x/"
       ],
       "matchDepNames": [
         "go"
@@ -56,18 +68,18 @@
       "additionalBranchPrefix": ""
     },
     {
-      "description": "Automatically merge patch updates for Go modules",
+      "description": "Automatically merge patch updates for Go modules (excluding golang.org/x packages which are grouped)",
       "matchManagers": [
         "gomod"
       ],
       "matchUpdateTypes": [
         "patch"
       ],
+      "excludePackagePatterns": [
+        "^golang\\.org/x/"
+      ],
       "automerge": true,
-      "automergeType": "pr",
-      "matchPackageNames": [
-        "!/^golang.org/x//"
-      ]
+      "automergeType": "pr"
     },
     {
       "description": "Group Kubernetes dependencies updates",
@@ -184,10 +196,7 @@
         "dependencies",
         "security"
       ],
-      "prPriority": 10,
-      "matchPackageNames": [
-        "!/^golang.org/x//"
-      ]
+      "prPriority": 10
     }
   ],
   "vulnerabilityAlerts": {
