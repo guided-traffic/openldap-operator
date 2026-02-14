@@ -164,7 +164,9 @@
       ],
       "groupName": "GitHub Actions",
       "automerge": false,
-      "automergeType": "pr"
+      "automergeType": "pr",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps"
     },
     {
       "description": "Require manual approval for major updates",
