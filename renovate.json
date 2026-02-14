@@ -224,8 +224,8 @@
     {
       "customType": "regex",
       "description": "Update Docker images in Helm values.yaml files",
-      "managerFilePatterns": [
-        "//(^|/)values\\.ya?ml$/"
+      "fileMatch": [
+        "(^|/)values\\.ya?ml$"
       ],
       "matchStrings": [
         "repository:\\s*(?<depName>[^\\s]+?)\\s+tag:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
@@ -236,8 +236,8 @@
     {
       "customType": "regex",
       "description": "Update GO_VERSION in GitHub Actions workflows",
-      "managerFilePatterns": [
-        "/.github/workflows/*.yml/"
+      "fileMatch": [
+        "^\\.github/workflows/.+\\.ya?ml$"
       ],
       "matchStrings": [
         "GO_VERSION:\\s*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"
