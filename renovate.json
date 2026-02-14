@@ -29,6 +29,33 @@
   "forkProcessing": "disabled",
   "packageRules": [
     {
+      "description": "Group all Go-related updates: go.mod, workflows, Containerfile, and golang.org/x packages",
+      "matchDatasources": [
+        "golang-version",
+        "go",
+        "docker"
+      ],
+      "matchManagers": [
+        "gomod",
+        "regex",
+        "dockerfile"
+      ],
+      "matchPackageNames": [
+        "go",
+        "golang",
+        "/^golang.org/x//"
+      ],
+      "matchDepNames": [
+        "go"
+      ],
+      "groupName": "Go ecosystem",
+      "automerge": false,
+      "automergeType": "pr",
+      "semanticCommitType": "fix",
+      "semanticCommitScope": "deps",
+      "additionalBranchPrefix": ""
+    },
+    {
       "description": "Automatically merge patch updates for Go modules",
       "matchManagers": [
         "gomod"
@@ -37,25 +64,10 @@
         "patch"
       ],
       "automerge": true,
-      "automergeType": "pr"
-    },
-    {
-      "description": "Group minor and patch updates for Go standard library",
-      "matchManagers": [
-        "gomod"
-      ],
-      "groupName": "golang.org/x packages",
-      "automerge": false,
       "automergeType": "pr",
       "matchPackageNames": [
-        "/^golang.org/x//"
-      ],
-      "matchDepTypes": [
-        "require",
-        "indirect"
-      ],
-      "rangeStrategy": "update-lockfile",
-      "enabled": true
+        "!/^golang.org/x//"
+      ]
     },
     {
       "description": "Group Kubernetes dependencies updates",
@@ -203,7 +215,14 @@
       "gomodTidy",
       "gomodUpdateImportPaths"
     ],
-    "rangeStrategy": "update-lockfile"
+    "rangeStrategy": "update-lockfile",
+    "constraints": {
+      "go": "1.26"
+    }
+  },
+  "ignorePaths": [],
+  "constraints": {
+    "go": ">=1.26"
   },
   "dockerfile": {
     "enabled": true
@@ -244,7 +263,23 @@
       ],
       "depNameTemplate": "go",
       "datasourceTemplate": "golang-version",
-      "versioningTemplate": "semver"
+      "versioningTemplate": "semver",
+      "groupName": "Go ecosystem"
+    },
+    {
+      "customType": "regex",
+      "description": "Update Golang Docker image in Containerfile",
+      "managerFilePatterns": [
+        "/Containerfile/",
+        "/Dockerfile/"
+      ],
+      "matchStrings": [
+        "FROM golang:(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)(-[a-z]+)?"
+      ],
+      "depNameTemplate": "golang",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker",
+      "groupName": "Go ecosystem"
     }
   ],
   "commitMessagePrefix": "fix(deps): ",
