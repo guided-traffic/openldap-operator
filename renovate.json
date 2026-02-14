@@ -37,7 +37,7 @@
       ],
       "matchManagers": [
         "gomod",
-        "regex",
+        "custom.regex",
         "dockerfile"
       ],
       "matchPackageNames": [
@@ -52,10 +52,8 @@
         "golang.org/x/term",
         "golang.org/x/text",
         "golang.org/x/time",
-        "golang.org/x/tools"
-      ],
-      "matchPackagePatterns": [
-        "^golang\\.org/x/"
+        "golang.org/x/tools",
+        "/^golang\\.org/x//"
       ],
       "matchDepNames": [
         "go"
@@ -75,11 +73,11 @@
       "matchUpdateTypes": [
         "patch"
       ],
-      "excludePackagePatterns": [
-        "^golang\\.org/x/"
-      ],
       "automerge": true,
-      "automergeType": "pr"
+      "automergeType": "pr",
+      "matchPackageNames": [
+        "!/^golang\\.org/x//"
+      ]
     },
     {
       "description": "Group Kubernetes dependencies updates",
@@ -252,8 +250,8 @@
     {
       "customType": "regex",
       "description": "Update Docker images in Helm values.yaml files",
-      "fileMatch": [
-        "(^|/)values\\.ya?ml$"
+      "managerFilePatterns": [
+        "/(^|/)values\\.ya?ml$/"
       ],
       "matchStrings": [
         "repository:\\s*(?<depName>[^\\s]+?)\\s+tag:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
@@ -264,8 +262,8 @@
     {
       "customType": "regex",
       "description": "Update GO_VERSION in GitHub Actions workflows",
-      "fileMatch": [
-        "^\\.github/workflows/.+\\.ya?ml$"
+      "managerFilePatterns": [
+        "/^\\.github/workflows/.+\\.ya?ml$/"
       ],
       "matchStrings": [
         "GO_VERSION:\\s*[\"']?(?<currentValue>[0-9]+\\.[0-9]+\\.[0-9]+)[\"']?"
