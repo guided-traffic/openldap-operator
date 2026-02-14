@@ -272,8 +272,7 @@
       ],
       "depNameTemplate": "go",
       "datasourceTemplate": "golang-version",
-      "versioningTemplate": "semver",
-      "groupName": "Go ecosystem"
+      "versioningTemplate": "semver"
     },
     {
       "customType": "regex",
@@ -287,8 +286,7 @@
       ],
       "depNameTemplate": "golang",
       "datasourceTemplate": "docker",
-      "versioningTemplate": "docker",
-      "groupName": "Go ecosystem"
+      "versioningTemplate": "docker"
     }
   ],
   "commitMessagePrefix": "fix(deps): ",
