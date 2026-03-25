@@ -5,12 +5,12 @@
     "docker:enableMajor",
     ":dependencyDashboard",
     ":semanticCommits",
-    ":automergeDigest",
-    ":automergeBranch"
+    ":automergeDigest"
   ],
   "schedule": [
     "at any time"
   ],
+  "platformAutomerge": true,
   "timezone": "Europe/Berlin",
   "labels": [
     "dependencies"
@@ -154,21 +154,6 @@
       "automerge": false
     },
     {
-      "description": "Group GitHub Actions updates",
-      "matchManagers": [
-        "github-actions"
-      ],
-      "matchUpdateTypes": [
-        "minor",
-        "patch"
-      ],
-      "groupName": "GitHub Actions",
-      "automerge": false,
-      "automergeType": "pr",
-      "semanticCommitType": "chore",
-      "semanticCommitScope": "deps"
-    },
-    {
       "description": "Require manual approval for major updates",
       "matchUpdateTypes": [
         "major"
@@ -199,6 +184,20 @@
         "security"
       ],
       "prPriority": 10
+    },
+    {
+      "description": "Group all GitHub Actions updates (including major) as chore commits so they don't trigger a semantic-release version bump",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions",
+      "automerge": false,
+      "automergeType": "pr",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps",
+      "labels": [
+        "dependencies"
+      ]
     }
   ],
   "vulnerabilityAlerts": {
