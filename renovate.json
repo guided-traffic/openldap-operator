@@ -148,12 +148,9 @@
       "automerge": false
     },
     {
-      "description": "Require manual approval for major updates.",
+      "description": "Require manual approval for major updates (except GitHub Actions, which are handled separately by a later rule)",
       "matchUpdateTypes": [
         "major"
-      ],
-      "excludeManagers": [
-        "github-actions"
       ],
       "automerge": false,
       "labels": [
