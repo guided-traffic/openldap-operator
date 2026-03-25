@@ -15,12 +15,6 @@
   "labels": [
     "dependencies"
   ],
-  "assignees": [
-    "hans-fischer"
-  ],
-  "reviewers": [
-    "hans-fischer"
-  ],
   "prHourlyLimit": 0,
   "prConcurrentLimit": 3,
   "branchConcurrentLimit": 3,
@@ -154,9 +148,12 @@
       "automerge": false
     },
     {
-      "description": "Require manual approval for major updates",
+      "description": "Require manual approval for major updates.",
       "matchUpdateTypes": [
         "major"
+      ],
+      "excludeManagers": [
+        "github-actions"
       ],
       "automerge": false,
       "labels": [
@@ -205,12 +202,6 @@
     "labels": [
       "security",
       "dependencies"
-    ],
-    "assignees": [
-      "hans-fischer"
-    ],
-    "reviewers": [
-      "hans-fischer"
     ]
   },
   "lockFileMaintenance": {
