@@ -580,7 +580,7 @@ jobs:
           docker save openldap-operator:test | docker exec -i openldap-operator-test-control-plane ctr --namespace=k8s.io images import -
 
       - name: Install Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
         with:
           version: 'v3.16.3'
 
