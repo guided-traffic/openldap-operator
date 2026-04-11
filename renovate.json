@@ -21,6 +21,11 @@
   "prConcurrentLimit": 3,
   "branchConcurrentLimit": 3,
   "rebaseWhen": "behind-base-branch",
+  "lockFileMaintenance": {
+    "schedule": ["at any time"],
+    "semanticCommitType": "chore",
+    "semanticCommitScope": "deps"
+  },
   "gitAuthor": "Renovate Bot <mail@s3ep.com>",
   "forkProcessing": "disabled",
   "packageRules": [
