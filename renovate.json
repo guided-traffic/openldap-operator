@@ -10,6 +10,8 @@
   "schedule": [
     "at any time"
   ],
+  "automerge": true,
+  "automergeType": "pr",
   "platformAutomerge": true,
   "timezone": "Europe/Berlin",
   "labels": [
@@ -55,7 +57,6 @@
         "go"
       ],
       "groupName": "Go ecosystem",
-      "automerge": false,
       "automergeType": "pr",
       "semanticCommitType": "fix",
       "semanticCommitScope": "deps",
@@ -81,7 +82,7 @@
         "gomod"
       ],
       "groupName": "Kubernetes dependencies",
-      "automerge": false,
+      "automergeType": "pr",
       "matchPackageNames": [
         "/^k8s\\.io//",
         "/^sigs\\.k8s\\.io//"
@@ -93,7 +94,7 @@
         "gomod"
       ],
       "groupName": "Testing frameworks",
-      "automerge": false,
+      "automergeType": "pr",
       "matchPackageNames": [
         "/^github\\.com/onsi//",
         "/^github\\.com/stretchr//"
@@ -111,12 +112,14 @@
       "automergeType": "pr"
     },
     {
-      "description": "Group semantic-release related packages",
+      "description": "Group semantic-release related packages as chore commits so they don't trigger a semantic-release version bump",
       "matchManagers": [
         "npm"
       ],
       "groupName": "semantic-release packages",
-      "automerge": false,
+      "automergeType": "pr",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "deps",
       "matchPackageNames": [
         "/^@semantic-release//",
         "/semantic-release/",
@@ -129,7 +132,7 @@
         "helm-values",
         "helmfile"
       ],
-      "automerge": false,
+      "automergeType": "pr",
       "labels": [
         "dependencies",
         "helm"
@@ -145,7 +148,7 @@
         "patch"
       ],
       "groupName": "Docker base images",
-      "automerge": false
+      "automergeType": "pr"
     },
     {
       "description": "Require manual approval for major updates (except GitHub Actions, which are handled separately by a later rule)",
@@ -185,7 +188,6 @@
         "github-actions"
       ],
       "groupName": "GitHub Actions",
-      "automerge": false,
       "automergeType": "pr",
       "semanticCommitType": "chore",
       "semanticCommitScope": "deps",
