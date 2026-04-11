@@ -208,12 +208,6 @@
       "dependencies"
     ]
   },
-  "lockFileMaintenance": {
-    "enabled": true,
-    "commitMessageAction": "Lock file maintenance",
-    "automerge": true,
-    "automergeType": "pr"
-  },
   "gomod": {
     "enabled": true,
     "postUpdateOptions": [
