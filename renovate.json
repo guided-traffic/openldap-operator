@@ -188,11 +188,12 @@
       "prPriority": 10
     },
     {
-      "description": "Group all GitHub Actions updates (including major) as chore commits so they don't trigger a semantic-release version bump",
+      "description": "Group all GitHub Actions updates (including major) as chore commits so they don't trigger a semantic-release version bump. Auto-merge without review.",
       "matchManagers": [
         "github-actions"
       ],
       "groupName": "GitHub Actions",
+      "automerge": true,
       "automergeType": "pr",
       "semanticCommitType": "chore",
       "semanticCommitScope": "deps",
