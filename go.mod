@@ -4,8 +4,8 @@ go 1.26.0
 
 require (
 	github.com/go-ldap/ldap/v3 v3.4.13
-	github.com/onsi/ginkgo/v2 v2.30.0
-	github.com/onsi/gomega v1.41.0
+	github.com/onsi/ginkgo/v2 v2.31.0
+	github.com/onsi/gomega v1.42.0
 	github.com/stretchr/testify v1.11.1
 	k8s.io/api v0.36.2
 	k8s.io/apimachinery v0.36.2
