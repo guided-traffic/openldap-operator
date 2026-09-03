@@ -77,7 +77,8 @@ func (r *LDAPServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		if err := r.Update(ctx, ldapServer); err != nil {
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		// Requeue so the freshly persisted finalizer is observed by the next reconcile.
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	// Handle deletion

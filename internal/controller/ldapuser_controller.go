@@ -45,6 +45,10 @@ const (
 	// Default organizational unit names
 	defaultUsersOU  = "users"
 	defaultGroupsOU = "groups"
+
+	// conditionTypeReady is the status condition type reported by the controllers
+	// in this package.
+	conditionTypeReady = "Ready"
 )
 
 // LDAPUserReconciler reconciles a LDAPUser object
@@ -82,7 +86,8 @@ func (r *LDAPUserReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 		if err := r.Update(ctx, ldapUser); err != nil {
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		// Requeue so the freshly persisted finalizer is observed by the next reconcile.
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	// Handle deletion
@@ -559,7 +564,7 @@ func (r *LDAPUserReconciler) updateStatus(ctx context.Context, ldapUser *openlda
 
 	// Update condition
 	condition := metav1.Condition{
-		Type:               "Ready",
+		Type:               conditionTypeReady,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: now,
 		Reason:             string(phase),
@@ -569,7 +574,7 @@ func (r *LDAPUserReconciler) updateStatus(ctx context.Context, ldapUser *openlda
 	if phase == openldapv1.UserPhaseReady || phase == openldapv1.UserPhaseWarning {
 		condition.Status = metav1.ConditionTrue
 		if phase == openldapv1.UserPhaseWarning {
-			condition.Type = "Ready"
+			condition.Type = conditionTypeReady
 			condition.Reason = "ReadyWithWarnings"
 		}
 	}

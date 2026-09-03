@@ -39,6 +39,12 @@ import (
 	openldapv1 "github.com/guided-traffic/openldap-operator/api/v1"
 )
 
+const (
+	// memberPlaceholderDN is the placeholder member entry used to satisfy the
+	// mandatory member attribute of groupOfNames/groupOfUniqueNames groups.
+	memberPlaceholderDN = "cn=dummy"
+)
+
 // LDAPGroupReconciler reconciles a LDAPGroup object
 type LDAPGroupReconciler struct {
 	client.Client
@@ -79,7 +85,8 @@ func (r *LDAPGroupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 			logger.Error(err, "Failed to add finalizer")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		// Requeue so the freshly persisted finalizer is observed by the next reconcile.
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	// Handle deletion
@@ -321,15 +328,15 @@ func (r *LDAPGroupReconciler) createLDAPGroup(ctx context.Context, conn *ldap.Co
 	case openldapv1.GroupTypeGroupOfNames:
 		addRequest.Attribute("objectClass", []string{"groupOfNames"})
 		// groupOfNames requires at least one member - add dummy member
-		addRequest.Attribute("member", []string{"cn=dummy"})
+		addRequest.Attribute("member", []string{memberPlaceholderDN})
 	case openldapv1.GroupTypeGroupOfUniqueNames:
 		addRequest.Attribute("objectClass", []string{"groupOfUniqueNames"})
 		// groupOfUniqueNames requires at least one uniqueMember - add dummy member
-		addRequest.Attribute("uniqueMember", []string{"cn=dummy"})
+		addRequest.Attribute("uniqueMember", []string{memberPlaceholderDN})
 	default:
 		// Default to groupOfNames
 		addRequest.Attribute("objectClass", []string{"groupOfNames"})
-		addRequest.Attribute("member", []string{"cn=dummy"})
+		addRequest.Attribute("member", []string{memberPlaceholderDN})
 	}
 
 	// Basic attributes
@@ -422,7 +429,7 @@ func (r *LDAPGroupReconciler) updateGroupStatus(ctx context.Context, conn *ldap.
 		// Filter out dummy members
 		filteredMembers := make([]string, 0)
 		for _, member := range currentMembers {
-			if member != "cn=dummy" {
+			if member != memberPlaceholderDN {
 				filteredMembers = append(filteredMembers, member)
 			}
 		}
@@ -455,7 +462,7 @@ func (r *LDAPGroupReconciler) updateStatus(ctx context.Context, ldapGroup *openl
 
 	// Update condition
 	condition := metav1.Condition{
-		Type:               "Ready",
+		Type:               conditionTypeReady,
 		Status:             metav1.ConditionFalse,
 		LastTransitionTime: now,
 		Reason:             string(phase),

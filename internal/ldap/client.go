@@ -31,6 +31,9 @@ const (
 	attrMember       = "member"
 	attrUniqueMember = "uniqueMember"
 	attrMemberUid    = "memberUid"
+
+	// objectClassTop is the LDAP structural root object class
+	objectClassTop = "top"
 )
 
 // Client represents an LDAP client wrapper
@@ -210,7 +213,7 @@ func (c *Client) CreateUser(userSpec *openldapv1.LDAPUserSpec) error {
 	attrs := []ldap.Attribute{
 		{
 			Type: "objectClass",
-			Vals: []string{"inetOrgPerson", "posixAccount", "top"},
+			Vals: []string{"inetOrgPerson", "posixAccount", objectClassTop},
 		},
 		{
 			Type: "uid",
@@ -358,13 +361,13 @@ func (c *Client) CreateGroup(groupSpec *openldapv1.LDAPGroupSpec) error {
 	var objectClasses []string
 	switch groupSpec.GroupType {
 	case openldapv1.GroupTypePosix:
-		objectClasses = []string{"posixGroup", "top"}
+		objectClasses = []string{"posixGroup", objectClassTop}
 	case openldapv1.GroupTypeGroupOfNames:
-		objectClasses = []string{"groupOfNames", "top"}
+		objectClasses = []string{"groupOfNames", objectClassTop}
 	case openldapv1.GroupTypeGroupOfUniqueNames:
-		objectClasses = []string{"groupOfUniqueNames", "top"}
+		objectClasses = []string{"groupOfUniqueNames", objectClassTop}
 	default:
-		objectClasses = []string{"groupOfNames", "top"}
+		objectClasses = []string{"groupOfNames", objectClassTop}
 	}
 
 	attrs := []ldap.Attribute{
