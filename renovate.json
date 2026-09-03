@@ -200,6 +200,16 @@
       "labels": [
         "dependencies"
       ]
+    },
+    {
+      "description": "Pin conventional-changelog-conventionalcommits below 10.4.0: 10.4.0 requires conventional-changelog-writer@9, but @semantic-release/release-notes-generator still depends on writer@8 and fails with Missing helper. Lift once release-notes-generator supports writer@9.",
+      "matchManagers": [
+        "npm"
+      ],
+      "matchPackageNames": [
+        "conventional-changelog-conventionalcommits"
+      ],
+      "allowedVersions": "<10.4.0"
     }
   ],
   "vulnerabilityAlerts": {
