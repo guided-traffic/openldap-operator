@@ -1,4 +1,4 @@
-.PHONY: build run test test-unit test-integration test-all coverage coverage-ci clean manifests generate fmt vet lint gosec vuln static quality security all-checks docker-build docker-buildx docker-push helm-lint helm-test help tools
+.PHONY: build run test test-unit test-integration test-all coverage coverage-ci clean manifests generate fmt vet lint gosec vuln static quality security all-checks docker-build docker-buildx docker-push helm-lint helm-test help tools golangci-lint
 
 # Build variables
 BINARY_NAME=manager
@@ -123,10 +123,9 @@ static:
 	$(GOFMT) -l .
 
 # Lint the code
-lint:
+lint: golangci-lint
 	@echo "Running linter..."
-	@which golangci-lint > /dev/null || (echo "Installing golangci-lint..." && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest)
-	golangci-lint run ./... --out-format=colored-line-number
+	$(GOLANGCI_LINT) run ./...
 
 # Gosec security scan
 gosec:
@@ -200,7 +199,7 @@ helm-test: helm-lint
 # Install development tools
 tools:
 	@echo "Installing development tools..."
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	go install github.com/securego/gosec/v2/cmd/gosec@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 
@@ -214,9 +213,12 @@ $(LOCALBIN):
 ## Tool Binaries
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
+GOLANGCI_LINT ?= $(LOCALBIN)/golangci-lint
 
 ## Tool Versions
 CONTROLLER_TOOLS_VERSION ?= v0.17.0
+# renovate: datasource=go depName=github.com/golangci/golangci-lint/v2
+GOLANGCI_LINT_VERSION ?= v2.13.2
 
 .PHONY: controller-gen
 controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
@@ -229,6 +231,13 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	@test -s $(LOCALBIN)/setup-envtest || \
 	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+
+.PHONY: golangci-lint
+golangci-lint: $(LOCALBIN) ## Download golangci-lint locally if necessary.
+	@# Compare the exact version, not mere presence, so a bump of
+	@# GOLANGCI_LINT_VERSION actually reinstalls the pinned binary.
+	@test "$$($(GOLANGCI_LINT) version --short 2>/dev/null)" = "$(GOLANGCI_LINT_VERSION:v%=%)" || \
+	GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 # Help
 help:
